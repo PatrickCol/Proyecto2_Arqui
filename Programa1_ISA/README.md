@@ -18,11 +18,13 @@ requieran forwarding ni stalling.
 
 ## Verificaciones
 
-- Ejecucion correcta de las instrucciones soportadas.
-- Resultados esperados en los registros.
-- Escritura y lectura correcta de memoria.
-- Ausencia de dependencias que requieran la Hazard Unit.
-- Ausencia de stalls inesperados.
+- Instrucciones tipo R: add, sub, and, or, xor, slt.
+- Instrucciones con inmediato: addi, andi, ori, xori, slti.
+- Memoria: sw y lw.
+- Salto condicional no tomado: beq.
+- Resultados esperados en los registros (x1 a x18) y en la memoria.
+- Ningun forwarding, stall ni flush: la Hazard Unit no interviene.
+- jal, jalr y beq tomado siempre provocan flush; se verifican en el Programa 4.
 
 ## Estado
 
