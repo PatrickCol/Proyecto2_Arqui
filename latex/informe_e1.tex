@@ -251,7 +251,7 @@ assign StallF  = lwStall;
 assign StallD  = lwStall;
 \end{vlog}
 
-\textbf{Flush.} Como el salto se decide en EX, para entonces ya entraron dos instrucciones del camino equivocado (en IF e ID). Si el salto se toma, ambas se anulan:
+\textbf{Flush.} Para instrucciones del formato B o de salto, el salto se decide en EX, pero para entonces ya entraron dos instrucciones (en IF e ID). Si el salto se toma, ambas se anulan, realizando el Flush con los registros IF/DF y DF/EX:
 
 \begin{vlog}
 assign FlushD = |PCSrcE;
