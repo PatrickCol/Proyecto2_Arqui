@@ -13,6 +13,10 @@ module tb_isa;
     integer i;
     integer errores;
     integer ciclos_stall;
+    integer ciclos_flush;
+    integer ciclos_forward;
+
+    reg [31:0] esperado [0:18];
 
     // Procesador original del grupo
     top dut (
@@ -49,6 +53,16 @@ module tb_isa;
         reset = 1;
         errores = 0;
         ciclos_stall = 0;
+        ciclos_flush = 0;
+        ciclos_forward = 0;
+
+        // Valores finales esperados de x1 a x18
+        esperado[1]  = 12;  esperado[2]  = 5;   esperado[3]  = 8;
+        esperado[4]  = 3;   esperado[5]  = 17;  esperado[6]  = 5;
+        esperado[7]  = 8;   esperado[8]  = 7;   esperado[9]  = 9;
+        esperado[10] = 1;   esperado[11] = -5;  esperado[12] = 4;
+        esperado[13] = 13;  esperado[14] = 7;   esperado[15] = 1;
+        esperado[16] = 12;  esperado[17] = 5;   esperado[18] = 1;
 
         #1;
 
@@ -66,52 +80,32 @@ module tb_isa;
         reset = 0;
 
         // Permitir completar las instrucciones
-        #300;
+        #400;
 
         $display("===== RESULTADOS ISA =====");
 
         // Verificar registros
-        if (dut.rvpipeline.dp.rf.rf[1] !== 32'd12)
-            errores = errores + 1;
+        for (i = 1; i <= 18; i = i + 1)
+            if (dut.rvpipeline.dp.rf.rf[i] !== esperado[i]) begin
+                $display("ERROR: x%0d = %0d (esperado %0d)",
+                         i, $signed(dut.rvpipeline.dp.rf.rf[i]), $signed(esperado[i]));
+                errores = errores + 1;
+            end
 
-        if (dut.rvpipeline.dp.rf.rf[2] !== 32'd5)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[3] !== 32'd8)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[4] !== 32'd3)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[5] !== 32'd17)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[6] !== 32'd5)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[7] !== 32'd8)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[8] !== 32'd7)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[9] !== 32'd9)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[10] !== 32'd20)
-            errores = errores + 1;
-
-        if (dut.rvpipeline.dp.rf.rf[11] !== 32'hFFFFFFFB)
-            errores = errores + 1;
-
-        // No deben existir stalls en este programa
-        if (ciclos_stall != 0) begin
-            $display("ERROR: Stall inesperado");
+        // Verificar memoria (sw)
+        if (dut.dmem.RAM[0] !== 32'd12 || dut.dmem.RAM[1] !== 32'd5) begin
+            $display("ERROR: memoria incorrecta");
             errores = errores + 1;
         end
 
-        $display("Ciclos con stall: %0d",
-                 ciclos_stall);
+        // Ninguna instruccion debe requerir la Hazard Unit
+        if (ciclos_stall != 0 || ciclos_flush != 0 || ciclos_forward != 0) begin
+            $display("ERROR: la Hazard Unit intervino");
+            errores = errores + 1;
+        end
+
+        $display("Ciclos con stall: %0d | flush: %0d | forwarding: %0d",
+                 ciclos_stall, ciclos_flush, ciclos_forward);
 
         if (errores == 0)
             $display("PASS: ISA sin dependencias");
@@ -121,12 +115,15 @@ module tb_isa;
         $finish;
     end
 
-    // Monitor de stalls
+    // Monitor de la Hazard Unit
     always @(negedge clk) begin
         if (!reset) begin
-            if (dut.rvpipeline.StallF ||
-                dut.rvpipeline.StallD)
+            if (StallF || StallD)
                 ciclos_stall = ciclos_stall + 1;
+            if (FlushD || FlushE)
+                ciclos_flush = ciclos_flush + 1;
+            if (ForwardAE != 2'b00 || ForwardBE != 2'b00)
+                ciclos_forward = ciclos_forward + 1;
         end
     end
 
