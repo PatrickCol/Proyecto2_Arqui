@@ -144,7 +144,7 @@ La Figura~\ref{fig:dp-single} muestra el datapath. Las señales llevan como sufi
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{../img/Pipeline_Single_Issue_Datapath_with_Hazard.jpg}\\[4pt]
-\caption{Datapath del pipeline Single-Issue. En azul, los caminos de forwarding desde MEM y WB hacia EX y la escritura en el Register File; en rojo punteado, las señales de la Hazard Unit.}
+\caption{Datapath del pipeline Single-Issue con la Hazard Unit: registros de pipeline, multiplexores de forwarding en EX y señales de stall y flush.}
 \label{fig:dp-single}
 \end{figure}
 
@@ -176,7 +176,7 @@ assign StallF  = lwStall;
 assign StallD  = lwStall;
 \end{vlog}
 
-\textbf{Flush.} Para instrucciones del formato B o de salto, el salto se decide en EX, pero para entonces ya entraron dos instrucciones (en IF e ID). Si el salto se toma, ambas se anulan, realizando el Flush con los registros IF/DF y DF/EX:
+\textbf{Flush.} Para instrucciones del formato B o de salto, el salto se decide en EX, pero para entonces ya entraron dos instrucciones (en IF e ID). Si el salto se toma, ambas se anulan, realizando el Flush con los registros IF/ID e ID/EX:
 
 \begin{vlog}
 assign FlushD = |PCSrcE;
