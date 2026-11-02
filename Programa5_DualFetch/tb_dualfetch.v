@@ -11,6 +11,7 @@ module tb_dualfetch;
     wire MemWrite;
 
     integer i;
+    integer fd;
     integer errores;
     integer pares_leidos;
     integer n_emitidas;
@@ -78,10 +79,14 @@ module tb_dualfetch;
             dut.imem.RAM[i] = 32'h00000013;
 
         // Cargar programa Dual Fetch
-        $readmemh(
-            "Programa5_DualFetch/dualfetch.mem",
-            dut.imem.RAM
-        );
+        // Ruta relativa a la carpeta principal; en Vivado el .mem se copia
+        // junto al simulador, asi que si no esta ahi se usa solo el nombre
+        fd = $fopen("Programa5_DualFetch/dualfetch.mem", "r");
+        if (fd) begin
+            $fclose(fd);
+            $readmemh("Programa5_DualFetch/dualfetch.mem", dut.imem.RAM);
+        end else
+            $readmemh("dualfetch.mem", dut.imem.RAM);
 
         #21;
         reset = 0;
