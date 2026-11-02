@@ -11,6 +11,7 @@ module tb_stalling;
     wire MemWrite;
 
     integer i;
+    integer fd;
     integer errores;
     integer ciclos_stall;
 
@@ -58,10 +59,14 @@ module tb_stalling;
             dut.imem.RAM[i] = 32'h00000013;
 
         // Cargar programa Stalling
-        $readmemh(
-            "Programa3_Stalling/stalling.mem",
-            dut.imem.RAM
-        );
+        // Ruta relativa a la carpeta principal; en Vivado el .mem se copia
+        // junto al simulador, asi que si no esta ahi se usa solo el nombre
+        fd = $fopen("Programa3_Stalling/stalling.mem", "r");
+        if (fd) begin
+            $fclose(fd);
+            $readmemh("Programa3_Stalling/stalling.mem", dut.imem.RAM);
+        end else
+            $readmemh("stalling.mem", dut.imem.RAM);
 
         #21;
         reset = 0;

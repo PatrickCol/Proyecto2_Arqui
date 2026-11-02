@@ -10,6 +10,7 @@ module tb_forwarding;
   wire MemWrite;
 
   integer i;
+  integer fd;
   integer errores;
   integer eventos_forwarding;
 
@@ -56,10 +57,14 @@ module tb_forwarding;
     for (i = 0; i < 64; i = i + 1)
       dut.imem.RAM[i] = 32'h00000013;
 
-    $readmemh(
-      "Programa2_Forwarding/forwarding.mem",
-      dut.imem.RAM
-    );
+    // Ruta relativa a la carpeta principal; en Vivado el .mem se copia
+    // junto al simulador, asi que si no esta ahi se usa solo el nombre
+    fd = $fopen("Programa2_Forwarding/forwarding.mem", "r");
+    if (fd) begin
+      $fclose(fd);
+      $readmemh("Programa2_Forwarding/forwarding.mem", dut.imem.RAM);
+    end else
+      $readmemh("forwarding.mem", dut.imem.RAM);
 
     #21;
     reset = 0;

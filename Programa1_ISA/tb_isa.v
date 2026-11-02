@@ -11,6 +11,7 @@ module tb_isa;
     wire MemWrite;
 
     integer i;
+    integer fd;
     integer errores;
     integer ciclos_stall;
     integer ciclos_flush;
@@ -71,10 +72,14 @@ module tb_isa;
             dut.imem.RAM[i] = 32'h00000013;
 
         // Cargar el Programa 1
-        $readmemh(
-            "Programa1_ISA/isa.mem",
-            dut.imem.RAM
-        );
+        // Ruta relativa a la carpeta principal; en Vivado el .mem se copia
+        // junto al simulador, asi que si no esta ahi se usa solo el nombre
+        fd = $fopen("Programa1_ISA/isa.mem", "r");
+        if (fd) begin
+            $fclose(fd);
+            $readmemh("Programa1_ISA/isa.mem", dut.imem.RAM);
+        end else
+            $readmemh("isa.mem", dut.imem.RAM);
 
         #21;
         reset = 0;
