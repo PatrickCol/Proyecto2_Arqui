@@ -26,6 +26,22 @@ module tb_flushing;
         .MemWrite(MemWrite)
     );
 
+    // Señales para el waveform: instruccion en cada etapa y Hazard Unit
+    wire [31:0] PCF       = dut.rvpipeline.dp.PCF;
+    wire [31:0] InstrF    = dut.rvpipeline.dp.InstrF;
+    wire [31:0] InstrD    = dut.rvpipeline.dp.InstrD;
+    wire [31:0] InstrE    = dut.rvpipeline.dp.InstrE;
+    wire [31:0] InstrM    = dut.rvpipeline.dp.InstrM;
+    wire [31:0] InstrW    = dut.rvpipeline.dp.InstrW;
+    wire [31:0] ResultW   = dut.rvpipeline.dp.ResultW;
+    wire        StallF    = dut.rvpipeline.StallF;
+    wire        StallD    = dut.rvpipeline.StallD;
+    wire        FlushD    = dut.rvpipeline.FlushD;
+    wire        FlushE    = dut.rvpipeline.FlushE;
+    wire [1:0]  ForwardAE = dut.rvpipeline.ForwardAE;
+    wire [1:0]  ForwardBE = dut.rvpipeline.ForwardBE;
+    wire [1:0]  PCSrcE    = dut.rvpipeline.PCSrcE;
+
     // Reloj de periodo 10 ns
     initial begin
         clk = 0;
