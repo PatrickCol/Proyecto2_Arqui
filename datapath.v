@@ -40,11 +40,12 @@ module datapath(input         clk, reset,
   // Dual Fetch: se leen InstrF (PCF) e InstrF1 (PCF+4) y el PC avanza de 8 en 8
   wire [31:0] PCNextF, PCPlus8F, PCTargetE, ALUResultE;
 
-  // El PC solo avanza cuando el par en Decode ya se emitio completo (SelD = 1)
+  // El PC avanza cuando el par en Decode ya se emitio completo (SelD = 1)
+  // o cuando hay un salto tomado (FlushD), para no perder el destino
   flopenr #(WIDTH) pcreg(
     .clk(clk),
     .reset(reset),
-    .en(~StallF & SelD),
+    .en(~StallF & (SelD | FlushD)),
     .d(PCNextF),
     .q(PCF)
   );

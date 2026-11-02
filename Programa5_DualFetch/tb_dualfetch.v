@@ -19,6 +19,7 @@ module tb_dualfetch;
     reg [31:0] orden    [0:10];   // orden en que deben llegar a EX
     reg [31:0] PCprev;
     reg        saltoPrev;
+    reg [31:0] destinoPrev;
 
     // Procesador del proyecto
     top dut (
@@ -138,6 +139,12 @@ module tb_dualfetch;
                 end
             end
 
+            // Despues de un salto tomado, el PC debe ser el destino del salto
+            if (saltoPrev === 1'b1 && PCF !== destinoPrev) begin
+                $display("ERROR: tras el salto PCF=%h (esperado %h)", PCF, destinoPrev);
+                errores = errores + 1;
+            end
+
             // Cada instruccion valida que llega a EX debe ser la siguiente del programa
             if (InstrE !== 32'h0 && InstrE !== 32'h00000013 && n_emitidas < 11) begin
                 if (InstrE !== orden[n_emitidas]) begin
@@ -148,7 +155,8 @@ module tb_dualfetch;
             end
 
             PCprev    = PCF;
-            saltoPrev = (PCSrcE != 2'b00);
+            saltoPrev   = (PCSrcE != 2'b00);
+            destinoPrev = dut.rvpipeline.dp.PCNextF;
         end
     end
 
