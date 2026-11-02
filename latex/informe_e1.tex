@@ -243,7 +243,7 @@ else if ((Rs1E != 0) && (Rs1E == RdW) && RegWriteW) ForwardAE = 2'b01; // desde 
 else                                                ForwardAE = 2'b00;
 \end{vlog}
 
-\textbf{Stall (load-use).} Un \sig{lw} recién tiene su dato al final de MEM. Si la instrucción que le sigue lo necesita, se congelan el PC y el registro IF/ID durante un ciclo y se mete una burbuja en EX:
+\textbf{Stall (load-use).} Un \sig{lw} recién tiene su dato al final de MEM. Si la instrucción que le sigue lo necesita, se congelan el PC y el registro IF/ID durante un ciclo y se ingresa una burbuja en EX:
 
 \begin{vlog}
 assign lwStall = ResultSrcE0 & (RdE != 5'b0) & ((Rs1D == RdE) | (Rs2D == RdE));
