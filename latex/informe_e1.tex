@@ -472,7 +472,7 @@ La base del Dual-Issue ya está: Fetch y Decode trabajan con pares de instruccio
 \appendix
 \section{Cómo reproducir las pruebas en Vivado}
 
-Cada programa está en su propia carpeta, con su código Assembly, su archivo \sig{.mem} y su testbench (Tabla~\ref{tab:repro}). Los programas 1 a 4 se simulan con la versión Single-Issue del código y el Programa~5 con la versión Dual-Issue; los programas 1 a 4 también pasan sin cambios en la versión Dual-Issue.
+El código entregado tiene dos carpetas: \sig{Single_Issue}, con la arquitectura A, y \sig{Dual_Issue}, con el avance hacia B. Dentro de cada una hay una carpeta por programa con su código Assembly, su archivo \sig{.mem} y su testbench (Tabla~\ref{tab:repro}). Los programas 1 a 4 también pasan sin cambios en \sig{Dual_Issue}.
 
 \begin{table}[htbp]
 \centering
@@ -481,26 +481,34 @@ Cada programa está en su propia carpeta, con su código Assembly, su archivo \s
 \label{tab:repro}
 \begin{tabular}{l l l l l}
 \toprule
-\textbf{Programa} & \textbf{Versión} & \textbf{Carpeta} & \textbf{Testbench} & \textbf{Programa cargado} \\
+\textbf{Programa} & \textbf{Código} & \textbf{Carpeta} & \textbf{Testbench} & \textbf{Programa cargado} \\
 \midrule
-1 (ISA)        & Single-Issue & \sig{Programa1_ISA}        & \sig{tb_isa.v}        & \sig{isa.mem} \\
-2 (Forwarding) & Single-Issue & \sig{Programa2_Forwarding} & \sig{tb_forwarding.v} & \sig{forwarding.mem} \\
-3 (Stalling)   & Single-Issue & \sig{Programa3_Stalling}   & \sig{tb_stalling.v}   & \sig{stalling.mem} \\
-4 (Flushing)   & Single-Issue & \sig{Programa4_Flushing}   & \sig{tb_flushing.v}   & \sig{flushing.mem} \\
-5 (Dual Fetch) & Dual-Issue   & \sig{Programa5_DualFetch}  & \sig{tb_dualfetch.v}  & \sig{dualfetch.mem} \\
+1 (ISA)        & \sig{Single_Issue} & \sig{Programa1_ISA}        & \sig{tb_isa.v}        & \sig{isa.mem} \\
+2 (Forwarding) & \sig{Single_Issue} & \sig{Programa2_Forwarding} & \sig{tb_forwarding.v} & \sig{forwarding.mem} \\
+3 (Stalling)   & \sig{Single_Issue} & \sig{Programa3_Stalling}   & \sig{tb_stalling.v}   & \sig{stalling.mem} \\
+4 (Flushing)   & \sig{Single_Issue} & \sig{Programa4_Flushing}   & \sig{tb_flushing.v}   & \sig{flushing.mem} \\
+5 (Dual Fetch) & \sig{Dual_Issue}   & \sig{Programa5_DualFetch}  & \sig{tb_dualfetch.v}  & \sig{dualfetch.mem} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Para simular, por ejemplo, el Programa~1:
+\textbf{Una sola vez, para crear el proyecto:}
 
 \begin{enumerate}
   \item Crear un proyecto RTL nuevo en Vivado.
-  \item Agregar como \textit{design sources} todos los archivos \sig{.v} de la carpeta principal del código (de \sig{adder.v} a \sig{top.v}).
-  \item Agregar como \textit{simulation sources} el testbench del programa y su \sig{.mem} asociado: \sig{Programa1_ISA/tb_isa.v} e \sig{Programa1_ISA/isa.mem}. Marcar el testbench como \textit{Set as Top}.
-  \item Ejecutar \textit{Run Simulation} $\to$ \textit{Run Behavioral Simulation}.
+  \item Agregar como \textit{design sources} todos los archivos \sig{.v} de la carpeta \sig{Single_Issue} (de \sig{adder.v} a \sig{top.v}). Para el Programa~5 se crea otro proyecto igual, pero con los \sig{.v} de \sig{Dual_Issue}.
 \end{enumerate}
 
-El testbench se detiene solo e imprime \sig{PASS} o \sig{FAIL} en la consola Tcl. En la ventana de waveform aparecen directamente \sig{PCF}, \sig{InstrF} a \sig{InstrW} y las señales de la Hazard Unit, porque el testbench las declara en su nivel superior. Para los demás programas se cambian el testbench y el \sig{.mem} por los de la Tabla~\ref{tab:repro}.
+\textbf{Para cada programa de la Tabla~\ref{tab:repro}:}
+
+\begin{enumerate}[resume]
+  \item Agregar como \textit{simulation sources} el testbench del programa y su \sig{.mem} asociado. Por ejemplo, para el Programa~1: \sig{Programa1_ISA/tb_isa.v} e \sig{Programa1_ISA/isa.mem}.
+  \item Hacer clic derecho sobre ese testbench y elegir \textit{Set as Top}.
+  \item Ejecutar \textit{Run Simulation} $\to$ \textit{Run Behavioral Simulation}.
+  \item Revisar la consola Tcl: el testbench se detiene solo e imprime \sig{PASS} o \sig{FAIL}.
+  \item Cerrar la simulación (\textit{Close Simulation}) antes de pasar al siguiente programa.
+\end{enumerate}
+
+En la ventana de waveform aparecen directamente \sig{PCF}, \sig{InstrF} a \sig{InstrW} y las señales de la Hazard Unit, porque el testbench las declara en su nivel superior. Es normal que Vivado muestre un aviso como \sig{WARNING: file Programa1_ISA/isa.mem could not be opened}: el testbench primero busca el \sig{.mem} dentro de la carpeta del programa y, al no encontrarlo ahí, carga la copia que Vivado deja en su carpeta de simulación.
 
 \end{document}
