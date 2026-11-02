@@ -11,6 +11,7 @@ module tb_flushing;
     wire MemWrite;
 
     integer i;
+    integer fd;
     integer errores;
     integer ciclos_flush;
     integer ciclos_stall;
@@ -70,10 +71,14 @@ module tb_flushing;
             dut.imem.RAM[i] = 32'h00000013;
 
         // Cargar programa Flushing
-        $readmemh(
-            "Programa4_Flushing/flushing.mem",
-            dut.imem.RAM
-        );
+        // Ruta relativa a la carpeta principal; en Vivado el .mem se copia
+        // junto al simulador, asi que si no esta ahi se usa solo el nombre
+        fd = $fopen("Programa4_Flushing/flushing.mem", "r");
+        if (fd) begin
+            $fclose(fd);
+            $readmemh("Programa4_Flushing/flushing.mem", dut.imem.RAM);
+        end else
+            $readmemh("flushing.mem", dut.imem.RAM);
 
         #21;
         reset = 0;
