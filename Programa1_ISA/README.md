@@ -26,4 +26,4 @@ requieran forwarding ni stalling.
 
 ## Estado
 
-En desarrollo. Pendiente de implementacion y simulacion.
+Verificado en simulación (PASS).

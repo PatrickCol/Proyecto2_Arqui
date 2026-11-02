@@ -11,4 +11,4 @@ Verificar el funcionamiento del forwarding en el procesador RISC-V RV32I Pipelin
 - tb_forwarding.v: Testbench de verificación.
 
 ## Estado
-En desarrollo. Pendiente de implementación y simulación.
+Verificado en simulación (PASS).

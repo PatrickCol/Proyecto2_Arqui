@@ -24,4 +24,4 @@ ante una dependencia Load-Use.
 
 ## Estado
 
-En desarrollo. Pendiente de implementación y simulación.
+Verificado en simulación (PASS).
