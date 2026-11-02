@@ -3,7 +3,8 @@
 // Dual-Issue preliminar (E1): Dual Fetch y Dual Decode de un par de instrucciones.
 // Por ahora se emite una instruccion por ciclo: SelD = 0 emite la mas antigua
 // del par (slot 0) y SelD = 1 la mas joven (slot 1); recien entonces entra el
-// siguiente par. La via 1 completa (Issue Unit, 2a ALU) se agrega en E2.
+// siguiente par. La via 1 ya tiene su registro ID/EX y su ALU (alu1), pero en E1
+// solo recibe burbujas (Issue1D = 0); la Issue Unit de E2 la activara.
 module datapath(input         clk, reset,
                 // Fetch
                 output [31:0] PCF,
@@ -18,6 +19,9 @@ module datapath(input         clk, reset,
                 input         ALUSrcE,
                 input  [2:0]  ALUControlE,
                 output        ZeroE,
+                input         Issue1D,
+                input         ALUSrcE1,
+                input  [2:0]  ALUControlE1,
                 // Memory
                 output [31:0] ALUResultM, WriteDataM,
                 input  [31:0] ReadDataM,
@@ -197,6 +201,34 @@ module datapath(input         clk, reset,
     .a(PCE),
     .b(ImmExtE),
     .y(PCTargetE)
+  );
+
+  // ============== Via 1: registro ID/EX y ALU ==============
+  // E1: Issue1D = 0, el registro se limpia y la via 1 solo procesa burbujas
+  wire [31:0] RD1E1, RD2E1, ImmExtE1, InstrE1, SrcBE1, ALUResultE1;
+  wire        ZeroE1;
+
+  floprc #(128) regE1(
+    .clk(clk),
+    .reset(reset),
+    .clear(FlushE | ~Issue1D),
+    .d({RD1D1, RD2D1, ImmExtD1, InstrD1}),
+    .q({RD1E1, RD2E1, ImmExtE1, InstrE1})
+  );
+
+  mux2 #(WIDTH) srcbmux1(
+    .d0(RD2E1),
+    .d1(ImmExtE1),
+    .s(ALUSrcE1),
+    .y(SrcBE1)
+  );
+
+  alu alu1(
+    .a(RD1E1),
+    .b(SrcBE1),
+    .alucontrol(ALUControlE1),
+    .result(ALUResultE1),
+    .zero(ZeroE1)
   );
 
   // ============== Registro EX/MEM ==============

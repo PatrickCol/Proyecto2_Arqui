@@ -13,7 +13,10 @@ module riscvpipeline(input         clk, reset,
   wire [31:0] InstrD, InstrD0, InstrD1;
   wire        SelD;
   wire [1:0]  ImmSrcD0, ImmSrcD1, PCSrcE, ResultSrcE, ResultSrcW, ForwardAE, ForwardBE;
-  wire [2:0]  ALUControlE;
+  wire [2:0]  ALUControlE, ALUControlE1;
+  wire        ALUSrcE1;
+  // Via 1: en E1 nunca se emite en ella; en E2 lo decidira la Issue Unit
+  wire        Issue1D = 1'b0;
   wire        ALUSrcE, ZeroE, RegWriteM, RegWriteW;
   wire        StallF, StallD, FlushD, FlushE;
   wire [4:0]  Rs1D, Rs2D, Rs1E, Rs2E, RdE, RdM, RdW;
@@ -28,6 +31,7 @@ module riscvpipeline(input         clk, reset,
     .funct7b5D0(InstrD0[30]),
     .funct7b5D1(InstrD1[30]),
     .SelD(SelD),
+    .Issue1D(Issue1D),
     .ImmSrcD0(ImmSrcD0),
     .ImmSrcD1(ImmSrcD1),
     .FlushE(FlushE),
@@ -35,6 +39,8 @@ module riscvpipeline(input         clk, reset,
     .PCSrcE(PCSrcE),
     .ALUSrcE(ALUSrcE),
     .ALUControlE(ALUControlE),
+    .ALUSrcE1(ALUSrcE1),
+    .ALUControlE1(ALUControlE1),
     .ResultSrcE(ResultSrcE),
     .MemWriteM(MemWrite),
     .RegWriteM(RegWriteM),
@@ -57,6 +63,9 @@ module riscvpipeline(input         clk, reset,
     .PCSrcE(PCSrcE),
     .ALUSrcE(ALUSrcE),
     .ALUControlE(ALUControlE),
+    .Issue1D(Issue1D),
+    .ALUSrcE1(ALUSrcE1),
+    .ALUControlE1(ALUControlE1),
     .ZeroE(ZeroE),
     .ALUResultM(ALUResult),
     .WriteDataM(WriteData),

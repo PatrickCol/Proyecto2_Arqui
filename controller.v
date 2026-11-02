@@ -12,6 +12,7 @@ module controller(input        clk, reset,
                   input  [2:0] funct3D0, funct3D1,
                   input        funct7b5D0, funct7b5D1,
                   input        SelD,
+                  input        Issue1D,
                   output [1:0] ImmSrcD0, ImmSrcD1,
                   // Execute
                   input        FlushE,
@@ -20,6 +21,8 @@ module controller(input        clk, reset,
                   output       ALUSrcE,
                   output [2:0] ALUControlE,
                   output [1:0] ResultSrcE,
+                  output       ALUSrcE1,
+                  output [2:0] ALUControlE1,
                   // Memory
                   output       MemWriteM,
                   output       RegWriteM,
@@ -94,6 +97,19 @@ module controller(input        clk, reset,
     .clear(FlushE),
     .d(SelD ? CtrlD1 : CtrlD0),
     .q({RegWriteE, ResultSrcE, MemWriteE, JumpE, BranchE, JalrE, ALUControlE, ALUSrcE})
+  );
+
+  // ---------- Registro ID/EX de la via 1 ----------
+  // E1: Issue1D = 0, la via 1 solo recibe burbujas; en E2 la Issue Unit la activara
+  wire       RegWriteE1, MemWriteE1, JumpE1, BranchE1, JalrE1;
+  wire [1:0] ResultSrcE1;
+
+  floprc #(11) regE1(
+    .clk(clk),
+    .reset(reset),
+    .clear(FlushE | ~Issue1D),
+    .d(CtrlD1),
+    .q({RegWriteE1, ResultSrcE1, MemWriteE1, JumpE1, BranchE1, JalrE1, ALUControlE1, ALUSrcE1})
   );
 
   // PCSrc se resuelve en Execute
