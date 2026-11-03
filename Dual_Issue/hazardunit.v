@@ -32,14 +32,15 @@ module hazardunit(input  [4:0] Rs1D, Rs2D,          // etapa Decode
 
   // ---------------- Stall por lw (load-use) ----------------
   // lw en EX y la instruccion en ID usa su destino
-  assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE));
+  assign lwStall = ResultSrcE0 & (RdE != 5'b0) & ((Rs1D == RdE) | (Rs2D == RdE));
 
   assign StallF = lwStall;
   assign StallD = lwStall;
 
   // ---------------- Flush por control hazard ----------------
   // El salto se resuelve en EX: se descartan las 2 instrucciones siguientes
-  assign FlushD = PCSrcE;
-  assign FlushE = lwStall | PCSrcE;  // burbuja por lw o por salto tomado
+  // |PCSrcE: cualquier salto tomado hace flush, incluido jalr (PCSrcE = 10)
+  assign FlushD = |PCSrcE;
+  assign FlushE = lwStall | (|PCSrcE);  // burbuja por lw o por salto tomado
 endmodule
 

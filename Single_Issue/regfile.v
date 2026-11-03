@@ -6,6 +6,9 @@ module regfile (input  clk,
 
   reg [31:0] rf[31:0]; 
 
+  integer i;
+  initial for (i = 0; i < 32; i = i + 1) rf[i] = 0;
+
   // CHANGE 2A: escribir en flanco de BAJADA (escribe 1a mitad, lee 2a mitad)
   always @(negedge clk)
     if (we3) rf[a3] <= wd3;
