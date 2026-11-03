@@ -492,23 +492,22 @@ El código entregado tiene dos carpetas: \sig{Single_Issue}, con la arquitectura
 \end{tabular}
 \end{table}
 
-\textbf{Una sola vez, para crear el proyecto:}
+Los programas 1 a 4 comparten un mismo proyecto de Vivado. El Programa~5 necesita otro, porque usa el código de \sig{Dual_Issue}.
 
+\paragraph{Crear el proyecto.}
 \begin{enumerate}
   \item Crear un proyecto RTL nuevo en Vivado.
-  \item Agregar como \textit{design sources} todos los archivos \sig{.v} de la carpeta \sig{Single_Issue} (de \sig{adder.v} a \sig{top.v}). Para el Programa~5 se crea otro proyecto igual, pero con los \sig{.v} de \sig{Dual_Issue}.
+  \item En \textit{Add Sources} $\to$ \textit{design sources}, agregar todos los \sig{.v} sueltos de \sig{Single_Issue} (los que no están dentro de una carpeta \sig{Programa}). Para el Programa~5 se usan los de \sig{Dual_Issue}.
 \end{enumerate}
 
-\textbf{Para cada programa de la Tabla~\ref{tab:repro}:}
-
-\begin{enumerate}[resume]
-  \item Agregar como \textit{simulation sources} el testbench del programa y su \sig{.mem} asociado. Por ejemplo, para el Programa~1: \sig{Programa1_ISA/tb_isa.v} e \sig{Programa1_ISA/isa.mem}.
-  \item Hacer clic derecho sobre ese testbench y elegir \textit{Set as Top}.
-  \item Ejecutar \textit{Run Simulation} $\to$ \textit{Run Behavioral Simulation}.
-  \item Revisar la consola Tcl: el testbench se detiene solo e imprime \sig{PASS} o \sig{FAIL}.
-  \item Cerrar la simulación (\textit{Close Simulation}) antes de pasar al siguiente programa.
+\paragraph{Simular un programa.}
+\begin{enumerate}
+  \item En \textit{Add Sources} $\to$ \textit{simulation sources}, agregar el testbench y el \sig{.mem} del programa según la Tabla~\ref{tab:repro}. Para el Programa~1 son \sig{Programa1_ISA/tb_isa.v} y \sig{Programa1_ISA/isa.mem}.
+  \item Comprobar que el testbench quedó como top: en \textit{Simulation Sources} aparece en negrita. Si hay más de un testbench en el proyecto, Vivado puede haber elegido otro; en ese caso, clic derecho sobre el correcto y \textit{Set as Top}.
+  \item \textit{Run Simulation} $\to$ \textit{Run Behavioral Simulation}. La simulación termina sola y la consola Tcl muestra \sig{PASS} o \sig{FAIL}.
+  \item Cerrar la simulación (\textit{Close Simulation}) y repetir los pasos con el siguiente programa de la tabla.
 \end{enumerate}
 
-En la ventana de waveform aparecen directamente \sig{PCF}, \sig{InstrF} a \sig{InstrW} y las señales de la Hazard Unit, porque el testbench las declara en su nivel superior. Es normal que Vivado muestre un aviso como \sig{WARNING: file Programa1_ISA/isa.mem could not be opened}: el testbench primero busca el \sig{.mem} dentro de la carpeta del programa y, al no encontrarlo ahí, carga la copia que Vivado deja en su carpeta de simulación.
+La waveform ya muestra \sig{PCF}, \sig{InstrF} a \sig{InstrW} y las señales de la Hazard Unit, porque el testbench las declara en su nivel superior, así que no hay que agregarlas a mano.
 
 \end{document}
