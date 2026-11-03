@@ -367,63 +367,8 @@ En esta entrega construimos la parte frontal del procesador Dual-Issue: leer y d
 
 \begin{figure}[htbp]
 \centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[x=1cm,y=1cm]
-  % --- fetch ---
-  \node[mux] (pcmux) at (0,3.0) {};
-  \node[blk, minimum width=0.8cm, minimum height=0.8cm] (pc) at (1.3,3.0) {PC};
-  \node[blk, minimum width=1.7cm, minimum height=2.6cm] (imem) at (3.2,3.0) {Instr.\\Memory\\[2pt]\scriptsize 2 puertos};
-  \node[blk, minimum width=0.9cm, minimum height=0.7cm] (add8) at (3.2,5.4) {$+8$};
-  % --- IF/ID doble ---
-  \node[preg, minimum height=1.4cm] (ifid0) at (5.2,3.7) {};
-  \node[preg, minimum height=1.4cm] (ifid1) at (5.2,1.9) {};
-  \node[lbl, above left] at (ifid0.north) {IF/ID doble};
-  % --- decode ---
-  \node[ctl, minimum width=1.9cm] (dec0) at (7.6,6.2) {Decoder 0};
-  \node[ctl, minimum width=1.9cm] (dec1) at (7.6,5.2) {Decoder 1};
-  \node[blk, minimum width=2.2cm, minimum height=2.0cm] (rf) at (7.6,3.0) {Register File\\[2pt]\scriptsize 4 lecturas\\\scriptsize 2 escrituras};
-  \node[blk, minimum width=1.3cm, minimum height=0.55cm] (ext0) at (7.6,1.2) {Extend 0};
-  \node[blk, minimum width=1.3cm, minimum height=0.55cm] (ext1) at (7.6,0.3) {Extend 1};
-  % --- seleccion y resto ---
-  \node[mux, minimum height=6.4cm] (sel) at (10.0,3.25) {};
-  \node[lbl, below] at (sel.south) {\sig{SelD}};
-  \node[preg, minimum height=6.4cm] (idex) at (11.2,3.25) {};
-  \node[lbl, above] at (idex.north) {ID/EX};
-  \node[blk, minimum width=3.2cm, minimum height=1.6cm] (via0) at (13.8,4.2) {Vía 0\\\scriptsize EX $\cdot$ MEM $\cdot$ WB\\\scriptsize (igual que Single-Issue)};
-  \node[futuro, minimum width=3.2cm, minimum height=1.4cm] (via1) at (13.8,1.6) {Vía 1: ID/EX y ALU 1\\\scriptsize instanciadas, inactivas\\\scriptsize (\sig{Issue1D = 0})};
-  % --- conexiones fetch ---
-  \draw[dat] (pcmux.east) -- (pc.west);
-  \draw[dat] (pc.east) -- (imem.west);
-  \draw[dat] (1.9,3.0) node[dot]{} |- (add8.west);
-  \draw[dat] (add8.north) -- (3.2,7.0) -- (-0.6,7.0) -- (-0.6,3.25) -- ([yshift=0.25cm]pcmux.west);
-  \draw[dat] (via0.north) -- (13.8,7.4) -- node[lbl,above]{\sig{PCTargetE} (desde EX)} (-0.9,7.4) -- (-0.9,2.75) -- ([yshift=-0.25cm]pcmux.west);
-  \draw[dat] (imem.east |- ifid0.west) -- node[lbl,above]{\sig{InstrF}} (ifid0.west);
-  \draw[dat] (imem.east |- ifid1.west) -- node[lbl,above]{\sig{InstrF1}} (ifid1.west);
-  % --- bus del slot 0 (x = 5.7) ---
-  \draw[thick] (ifid0.east) -- (5.7,3.7) node[dot]{};
-  \draw[dat] (5.7,3.7) |- (dec0.west);
-  \draw[dat] (5.7,3.6) |- ([yshift=0.6cm]rf.west);
-  \draw[dat] (5.7,3.7) |- (ext0.west);
-  % --- bus del slot 1 (x = 6.0) ---
-  \draw[thick] (ifid1.east) -- (6.0,1.9) node[dot]{};
-  \draw[dat] (6.0,1.9) |- (dec1.west);
-  \draw[dat] (6.0,1.9) |- ([yshift=-0.6cm]rf.west);
-  \draw[dat] (6.0,1.9) |- (ext1.west);
-  % --- hacia el mux de seleccion ---
-  \draw[dat] (dec0.east) -- node[lbl,above]{control 0} (dec0.east -| sel.west);
-  \draw[dat] (dec1.east) -- node[lbl,above]{control 1} (dec1.east -| sel.west);
-  \draw[dat] ([yshift=0.5cm]rf.east) -- node[lbl,above,pos=0.5,font=\tiny]{\sig{RD1D0, RD2D0}} ([yshift=0.5cm]rf.east -| sel.west);
-  \draw[dat] ([yshift=-0.5cm]rf.east) -- node[lbl,above,pos=0.5,font=\tiny]{\sig{RD1D1, RD2D1}} ([yshift=-0.5cm]rf.east -| sel.west);
-  \draw[dat] (ext0.east) -- node[lbl,above,pos=0.62,font=\tiny]{\sig{ImmExtD0}} (ext0.east -| sel.west);
-  \draw[dat] (ext1.east) -- node[lbl,above,pos=0.62,font=\tiny]{\sig{ImmExtD1}} (ext1.east -| sel.west);
-  \draw[dat] (sel.east) -- (sel.east -| idex.west);
-  \draw[dat] (idex.east |- via0.west) -- (via0.west);
-  \draw[dat, dashed, gray] (idex.east |- via1.west) -- (via1.west);
-  % --- escrituras en el Register File ---
-  \draw[fwd] (via0.east) -- (15.8,4.2) -- (15.8,-0.6) -- node[lbl,below,pos=0.4]{\sig{ResultW} (vía 0)} (8.45,-0.6) -- (8.45,2.0);
-  \draw[dat, dashed, gray] (via1.east) -- (16.2,1.6) -- (16.2,-1.0) -- node[lbl,below,pos=0.4]{escritura de la vía 1 (E2)} (8.6,-1.0) -- (8.6,2.0);
-\end{tikzpicture}}
-\caption{Datapath Dual-Issue preliminar. El par se lee y decodifica en paralelo y el multiplexor controlado por \sig{SelD} elige qué instrucción pasa a EX. En gris, la vía 1: su registro ID/EX y su ALU ya están instanciados, pero en E1 solo reciben burbujas.}
+\includegraphics[width=\textwidth]{../img/datapath_dual_issue_v2.png}
+\caption{Datapath Dual-Issue preliminar. Arriba la vía~0 y abajo la vía~1; cada registro de pipeline está partido en una sección por vía. En blanco, lo que se mantiene del Single-Issue (Figura~\ref{fig:dp-single}); en celeste, lo agregado en E1 para leer y decodificar el par; en gris punteado, la vía~1 después de Decode, que ya tiene su registro ID/EX y su ALU pero en E1 solo recibe burbujas.}
 \label{fig:dp-dual}
 \end{figure}
 
