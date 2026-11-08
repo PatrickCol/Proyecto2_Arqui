@@ -1,40 +1,43 @@
-// Controller pipeline: decodifica en ID y propaga las senales hasta su etapa
-//   ID : ImmSrc
-//   EX : ALUSrc, ALUControl, Branch, Jump, Jalr (-> PCSrcE), ResultSrc[0] (para el hazard unit)
-//   MEM: MemWrite, RegWrite
-//   WB : RegWrite, ResultSrc
-// PCSrc = {Jalr, Branch & Zero | Jump}, ahora calculado en EX (ZeroE)
-// Dual Decode: se decodifican las dos instrucciones del par (slot 0 y slot 1)
-// y pasa a EX el control de la instruccion emitida (SelD)
+// Controller Dual-Issue (E2)
+//   - Decodifica las DOS instrucciones del par en ID (maindec + aludec por slot)
+//   - Cada via lleva su propio registro de control ID/EX -> EX/MEM -> MEM/WB
+//   - El registro ID/EX de cada via se limpia con FlushE o si esa via no emite (Issue = 0)
+//   - El registro EX/MEM de la via 1 tiene clear propio (FlushM1): anula la instruccion mas
+//     joven del par cuando el salto esta en la via 0
+//   - PCSrc se calcula por via en EX: {Jalr, (Branch & Zero) | Jump}. Solo una via puede tener
+//     un salto (la Issue Unit lo garantiza), asi que el resolutor es uno solo.
+//   - Entrega a la Issue Unit y a la Hazard Unit los datos de decodificacion del par.
 module controller(input        clk, reset,
-                  // Decode
+                  // ---- Decode (par) ----
                   input  [6:0] opD0, opD1,
                   input  [2:0] funct3D0, funct3D1,
                   input        funct7b5D0, funct7b5D1,
-                  input        SelD,
-                  input        Issue1D,
                   output [1:0] ImmSrcD0, ImmSrcD1,
-                  // Execute
-                  input        FlushE,
-                  input        ZeroE,
-                  output [1:0] PCSrcE,
-                  output       ALUSrcE,
-                  output [2:0] ALUControlE,
-                  output [1:0] ResultSrcE,
-                  output       ALUSrcE1,
-                  output [2:0] ALUControlE1,
-                  // Memory
-                  output       MemWriteM,
-                  output       RegWriteM,
-                  // Writeback
-                  output       RegWriteW,
-                  output [1:0] ResultSrcW);
+                  output       RegWriteD0,
+                  output       IsMemD0, IsMemD1,
+                  output       IsCtrlD0, IsCtrlD1,
+                  output       UsesRs1D0, UsesRs2D0, UsesRs1D1, UsesRs2D1,
+                  // ---- Emision y flush ----
+                  input        Issue0, Issue1,
+                  input        FlushE, FlushM1,
+                  // ---- Execute via 0 / via 1 ----
+                  input        ZeroE0, ZeroE1,
+                  output [1:0] PCSrcE0, PCSrcE1,
+                  output       ALUSrcE0, ALUSrcE1,
+                  output [2:0] ALUControlE0, ALUControlE1,
+                  output       LoadE0, LoadE1,
+                  // ---- Memory ----
+                  output       MemWriteM,      // algun store en MEM
+                  output       MemSelM1,       // la via 1 es duena del puerto de memoria
+                  output       RegWriteM0, RegWriteM1,
+                  // ---- Writeback ----
+                  output       RegWriteW0, RegWriteW1,
+                  output [1:0] ResultSrcW0, ResultSrcW1);
 
-  // ---------- Decode (slot 0) ----------
-  wire [1:0] ALUOpD0;
-  wire [1:0] ResultSrcD0;
+  // =============== DECODE SLOT 0 ===============
+  wire [1:0] ALUOpD0, ResultSrcD0;
   wire [2:0] ALUControlD0;
-  wire       BranchD0, JumpD0, JalrD0, ALUSrcD0, RegWriteD0, MemWriteD0;
+  wire       BranchD0, JumpD0, JalrD0, ALUSrcD0, MemWriteD0;
 
   maindec md0(
     .op(opD0),
@@ -57,9 +60,8 @@ module controller(input        clk, reset,
     .ALUControl(ALUControlD0)
   );
 
-  // ---------- Decode (slot 1) ----------
-  wire [1:0] ALUOpD1;
-  wire [1:0] ResultSrcD1;
+  // =============== DECODE SLOT 1 ===============
+  wire [1:0] ALUOpD1, ResultSrcD1;
   wire [2:0] ALUControlD1;
   wire       BranchD1, JumpD1, JalrD1, ALUSrcD1, RegWriteD1, MemWriteD1;
 
@@ -84,52 +86,86 @@ module controller(input        clk, reset,
     .ALUControl(ALUControlD1)
   );
 
-  // ---------- Control de la instruccion emitida ----------
+  // =============== Datos para Issue Unit / Hazard Unit ===============
+  assign IsMemD0  = MemWriteD0 | (ResultSrcD0 == 2'b01);      // load o store
+  assign IsMemD1  = MemWriteD1 | (ResultSrcD1 == 2'b01);
+  assign IsCtrlD0 = BranchD0 | JumpD0 | JalrD0;               // branch, jal o jalr
+  assign IsCtrlD1 = BranchD1 | JumpD1 | JalrD1;
+
+  // Que registros fuente usa cada instruccion (evita dependencias falsas, p. ej. addi no usa rs2)
+  assign UsesRs1D0 = (opD0 != 7'b1101111);                    // todas menos jal
+  assign UsesRs1D1 = (opD1 != 7'b1101111);
+  assign UsesRs2D0 = (opD0 == 7'b0110011) | (opD0 == 7'b0100011) | (opD0 == 7'b1100011); // R, sw, beq
+  assign UsesRs2D1 = (opD1 == 7'b0110011) | (opD1 == 7'b0100011) | (opD1 == 7'b1100011);
+
+  // =============== ID/EX (un registro por via) ===============
   wire [10:0] CtrlD0 = {RegWriteD0, ResultSrcD0, MemWriteD0, JumpD0, BranchD0, JalrD0, ALUControlD0, ALUSrcD0};
   wire [10:0] CtrlD1 = {RegWriteD1, ResultSrcD1, MemWriteD1, JumpD1, BranchD1, JalrD1, ALUControlD1, ALUSrcD1};
 
-  // ---------- Registro ID/EX (con flush) ----------
-  wire       RegWriteE, MemWriteE, JumpE, BranchE, JalrE;
-
-  floprc #(11) regE(
-    .clk(clk),
-    .reset(reset),
-    .clear(FlushE),
-    .d(SelD ? CtrlD1 : CtrlD0),
-    .q({RegWriteE, ResultSrcE, MemWriteE, JumpE, BranchE, JalrE, ALUControlE, ALUSrcE})
-  );
-
-  // ---------- Registro ID/EX de la via 1 ----------
-  // E1: Issue1D = 0, la via 1 solo recibe burbujas; en E2 la Issue Unit la activara
+  wire       RegWriteE0, MemWriteE0, JumpE0, BranchE0, JalrE0;
+  wire [1:0] ResultSrcE0;
   wire       RegWriteE1, MemWriteE1, JumpE1, BranchE1, JalrE1;
   wire [1:0] ResultSrcE1;
+
+  floprc #(11) regE0(
+    .clk(clk),
+    .reset(reset),
+    .clear(FlushE | ~Issue0),
+    .d(CtrlD0),
+    .q({RegWriteE0, ResultSrcE0, MemWriteE0, JumpE0, BranchE0, JalrE0, ALUControlE0, ALUSrcE0})
+  );
 
   floprc #(11) regE1(
     .clk(clk),
     .reset(reset),
-    .clear(FlushE | ~Issue1D),
+    .clear(FlushE | ~Issue1),
     .d(CtrlD1),
     .q({RegWriteE1, ResultSrcE1, MemWriteE1, JumpE1, BranchE1, JalrE1, ALUControlE1, ALUSrcE1})
   );
 
-  // PCSrc se resuelve en Execute
-  assign PCSrcE = {JalrE, (BranchE & ZeroE) | JumpE};
+  // Resolutor de saltos (en EX): una senal PCSrc por via; la via sin salto aporta 00
+  assign PCSrcE0 = {JalrE0, (BranchE0 & ZeroE0) | JumpE0};
+  assign PCSrcE1 = {JalrE1, (BranchE1 & ZeroE1) | JumpE1};
 
-  // ---------- Registro EX/MEM ----------
-  wire [1:0] ResultSrcM;
+  // lw en EX (ResultSrc = 01), para la deteccion de load-use
+  assign LoadE0 = (ResultSrcE0 == 2'b01);
+  assign LoadE1 = (ResultSrcE1 == 2'b01);
 
-  flopr #(4) regM(
+  // =============== EX/MEM ===============
+  wire [1:0] ResultSrcM0, ResultSrcM1;
+  wire       MemWriteM0, MemWriteM1;
+
+  flopr #(4) regM0(
     .clk(clk),
     .reset(reset),
-    .d({RegWriteE, ResultSrcE, MemWriteE}),
-    .q({RegWriteM, ResultSrcM, MemWriteM})
+    .d({RegWriteE0, ResultSrcE0, MemWriteE0}),
+    .q({RegWriteM0, ResultSrcM0, MemWriteM0})
   );
 
-  // ---------- Registro MEM/WB ----------
-  flopr #(3) regW(
+  floprc #(4) regM1(
     .clk(clk),
     .reset(reset),
-    .d({RegWriteM, ResultSrcM}),
-    .q({RegWriteW, ResultSrcW})
+    .clear(FlushM1),
+    .d({RegWriteE1, ResultSrcE1, MemWriteE1}),
+    .q({RegWriteM1, ResultSrcM1, MemWriteM1})
+  );
+
+  // Puerto de memoria unico: store/load de la via 1 -> la via 1 lo usa; en otro caso, la via 0
+  assign MemWriteM = MemWriteM0 | MemWriteM1;
+  assign MemSelM1  = MemWriteM1 | (ResultSrcM1 == 2'b01);
+
+  // =============== MEM/WB ===============
+  flopr #(3) regW0(
+    .clk(clk),
+    .reset(reset),
+    .d({RegWriteM0, ResultSrcM0}),
+    .q({RegWriteW0, ResultSrcW0})
+  );
+
+  flopr #(3) regW1(
+    .clk(clk),
+    .reset(reset),
+    .d({RegWriteM1, ResultSrcM1}),
+    .q({RegWriteW1, ResultSrcW1})
   );
 endmodule
