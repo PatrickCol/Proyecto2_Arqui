@@ -1,157 +1,221 @@
-
 `timescale 1ns/1ps
-
+// ============================================================================
+// Testbench E2 - flushing
+//   * Verifica el ORDEN DE RETIRO: el PC de cada instruccion valida que llega a WB
+//     (primero la via 0 y luego la via 1) debe coincidir con la traza del programa.
+//     Asi se detectan instrucciones perdidas, repetidas o ejecutadas por el camino equivocado.
+//   * Verifica registros y memoria finales.
+//   * Mide ciclos, IPC y uso de la doble emision, con el mismo criterio para toda arquitectura:
+//     ciclos = flancos de bajada desde que baja el reset hasta que se retira la ultima
+//     instruccion de la traza (el primer paso por el lazo final del programa).
+//   Requiere el archivo flushing.mem como simulation source.
+// ============================================================================
 module tb_flushing;
 
-    reg clk;
-    reg reset;
+  localparam NT = 14;      // instrucciones que deben retirarse
+  localparam NM = 1;      // palabras de memoria de datos que escribe el programa
 
-    wire [31:0] WriteData;
-    wire [31:0] DataAdr;
-    wire MemWrite;
+  reg         clk;
+  reg         reset;
+  wire [31:0] WriteData;
+  wire [31:0] DataAdr;
+  wire        MemWrite;
 
-    integer i;
-    integer fd;
-    integer errores;
-    integer ciclos_flush;
-    integer ciclos_stall;
+  integer i;
+  integer errors, retired, cycles, cycles_done, finishing;
+  integer pairs, singles, stalls, flushes, ipc100, util100;
+  reg [31:0] trace     [0:NT-1];
+  reg [31:0] exp_reg   [0:31];
+  reg [31:0] exp_maddr [0:NM-1];
+  reg [31:0] exp_mval  [0:NM-1];
 
-    reg [31:0] esperado [0:16];
+  top dut(
+    .clk(clk),
+    .reset(reset),
+    .WriteData(WriteData),
+    .DataAdr(DataAdr),
+    .MemWrite(MemWrite)
+  );
 
-    // Procesador original del proyecto
-    top dut (
-        .clk(clk),
-        .reset(reset),
-        .WriteData(WriteData),
-        .DataAdr(DataAdr),
-        .MemWrite(MemWrite)
-    );
+  // ---- Senales para el waveform (aparecen en el nivel superior del testbench) ----
+  wire [31:0] PCF       = dut.rvpipeline.dp.PCF;
+  wire [31:0] InstrF    = dut.rvpipeline.dp.InstrF;
+  wire [31:0] InstrF1   = dut.rvpipeline.dp.InstrF1;
+  wire [31:0] InstrD0   = dut.rvpipeline.dp.InstrD0;
+  wire [31:0] InstrD1   = dut.rvpipeline.dp.InstrD1;
+  wire        ValidD0   = dut.rvpipeline.dp.ValidD0;
+  wire        ValidD1   = dut.rvpipeline.dp.ValidD1;
+  wire        Issue0    = dut.rvpipeline.Issue0;
+  wire        Issue1    = dut.rvpipeline.Issue1;
+  wire [1:0]  Consumed  = dut.rvpipeline.Consumed;
+  wire        RawPair   = dut.rvpipeline.RawPair;
+  wire        MemConflict  = dut.rvpipeline.MemConflict;
+  wire        CtrlConflict = dut.rvpipeline.CtrlConflict;
+  wire        LoadUse0  = dut.rvpipeline.LoadUse0;
+  wire        LoadUse1  = dut.rvpipeline.LoadUse1;
+  wire        FlushD    = dut.rvpipeline.FlushD;
+  wire        FlushE    = dut.rvpipeline.FlushE;
+  wire        FlushM1   = dut.rvpipeline.FlushM1;
+  wire [2:0]  ForwardA0 = dut.rvpipeline.ForwardA0;
+  wire [2:0]  ForwardB0 = dut.rvpipeline.ForwardB0;
+  wire [2:0]  ForwardA1 = dut.rvpipeline.ForwardA1;
+  wire [2:0]  ForwardB1 = dut.rvpipeline.ForwardB1;
+  wire [31:0] InstrE0   = dut.rvpipeline.dp.InstrE0;
+  wire [31:0] InstrE1   = dut.rvpipeline.dp.InstrE1;
+  wire [31:0] InstrM0   = dut.rvpipeline.dp.InstrM0;
+  wire [31:0] InstrM1   = dut.rvpipeline.dp.InstrM1;
+  wire [31:0] InstrW0   = dut.rvpipeline.dp.InstrW0;
+  wire [31:0] InstrW1   = dut.rvpipeline.dp.InstrW1;
+  wire        ValidW0   = dut.rvpipeline.dp.ValidW0;
+  wire        ValidW1   = dut.rvpipeline.dp.ValidW1;
+  wire [31:0] PCW0      = dut.rvpipeline.dp.PCW0;
+  wire [31:0] PCW1      = dut.rvpipeline.dp.PCW1;
 
-    // Señales para el waveform: instruccion en cada etapa y Hazard Unit
-    wire [31:0] PCF       = dut.rvpipeline.dp.PCF;
-    wire [31:0] InstrF    = dut.rvpipeline.dp.InstrF;
-    wire [31:0] InstrD    = dut.rvpipeline.dp.InstrD;
-    wire [31:0] InstrE    = dut.rvpipeline.dp.InstrE;
-    wire [31:0] InstrM    = dut.rvpipeline.dp.InstrM;
-    wire [31:0] InstrW    = dut.rvpipeline.dp.InstrW;
-    wire [31:0] ResultW   = dut.rvpipeline.dp.ResultW;
-    wire        StallF    = dut.rvpipeline.StallF;
-    wire        StallD    = dut.rvpipeline.StallD;
-    wire        FlushD    = dut.rvpipeline.FlushD;
-    wire        FlushE    = dut.rvpipeline.FlushE;
-    wire [1:0]  ForwardAE = dut.rvpipeline.ForwardAE;
-    wire [1:0]  ForwardBE = dut.rvpipeline.ForwardBE;
-    wire [1:0]  PCSrcE    = dut.rvpipeline.PCSrcE;
+  // ---- Valores esperados (generados con el simulador de referencia) ----
+  initial begin
+    errors = 0; retired = 0; cycles = 0; cycles_done = 0; finishing = 0;
+    pairs = 0; singles = 0; stalls = 0; flushes = 0;
+    trace[0] = 32'h00000000;
+    trace[1] = 32'h00000004;
+    trace[2] = 32'h00000008;
+    trace[3] = 32'h0000000c;
+    trace[4] = 32'h00000010;
+    trace[5] = 32'h00000014;
+    trace[6] = 32'h00000020;
+    trace[7] = 32'h00000024;
+    trace[8] = 32'h00000030;
+    trace[9] = 32'h00000034;
+    trace[10] = 32'h00000038;
+    trace[11] = 32'h00000044;
+    trace[12] = 32'h00000048;
+    trace[13] = 32'h0000004c;
+    exp_reg[0] = 32'd0;
+    exp_reg[1] = 32'd5;
+    exp_reg[2] = 32'd5;
+    exp_reg[3] = 32'd7;
+    exp_reg[4] = 32'd1;
+    exp_reg[5] = 32'd0;
+    exp_reg[6] = 32'd0;
+    exp_reg[7] = 32'd2;
+    exp_reg[8] = 32'd40;
+    exp_reg[9] = 32'd0;
+    exp_reg[10] = 32'd0;
+    exp_reg[11] = 32'd3;
+    exp_reg[12] = 32'd68;
+    exp_reg[13] = 32'd60;
+    exp_reg[14] = 32'd0;
+    exp_reg[15] = 32'd0;
+    exp_reg[16] = 32'd4;
+    exp_reg[17] = 32'd0;
+    exp_reg[18] = 32'd0;
+    exp_reg[19] = 32'd0;
+    exp_reg[20] = 32'd0;
+    exp_reg[21] = 32'd0;
+    exp_reg[22] = 32'd0;
+    exp_reg[23] = 32'd0;
+    exp_reg[24] = 32'd0;
+    exp_reg[25] = 32'd0;
+    exp_reg[26] = 32'd0;
+    exp_reg[27] = 32'd0;
+    exp_reg[28] = 32'd0;
+    exp_reg[29] = 32'd0;
+    exp_reg[30] = 32'd0;
+    exp_reg[31] = 32'd0;
+    exp_maddr[0] = 32'd0; exp_mval[0] = 32'd4;
+  end
 
-    // Reloj de periodo 10 ns
-    initial begin
-        clk = 0;
-        forever #5 clk = ~clk;
-    end
+  // ---- Reloj de 10 ns y reset de 22 ns ----
+  initial begin
+    clk = 0;
+    forever #5 clk = ~clk;
+  end
 
-    // Carga del programa de prueba
-    initial begin
-        reset = 1;
-        errores = 0;
-        ciclos_flush = 0;
-        ciclos_stall = 0;
+  initial begin
+    reset = 1;
+    #1;
+    for (i = 0; i < 256; i = i + 1) dut.imem.RAM[i] = 32'h00000013;   // memoria sin programar = NOP
+    for (i = 0; i < 256; i = i + 1) dut.dmem.RAM[i] = 32'h00000000;
+    $readmemh("flushing.mem", dut.imem.RAM);
+    #21;
+    reset = 0;
+  end
 
-        // Valores finales esperados (99 = instruccion que debio anularse)
-        esperado[0]  = 0;  esperado[1]  = 5;  esperado[2]  = 5;
-        esperado[3]  = 7;  esperado[4]  = 1;  esperado[5]  = 0;
-        esperado[6]  = 0;  esperado[7]  = 2;  esperado[8]  = 40;
-        esperado[9]  = 0;  esperado[10] = 0;  esperado[11] = 3;
-        esperado[12] = 68; esperado[13] = 60; esperado[14] = 0;
-        esperado[15] = 0;  esperado[16] = 4;
+  // ---- Monitor: se evalua en cada flanco de bajada ----
+  always @(negedge clk) begin
+    if (reset === 1'b0 && finishing < 2) begin
+      cycles = cycles + 1;
 
-        #1;
+      // Estadisticas de emision (par en Decode)
+      if (Issue1 === 1'b1)        pairs   = pairs + 1;
+      else if (Issue0 === 1'b1)   singles = singles + 1;
+      else if (ValidD0 === 1'b1)  stalls  = stalls + 1;
+      if (FlushD === 1'b1)        flushes = flushes + 1;
 
-        // Rellenar memoria con NOP
-        for (i = 0; i < 64; i = i + 1)
-            dut.imem.RAM[i] = 32'h00000013;
-
-        // Cargar programa Flushing
-        // Ruta relativa a la carpeta principal; en Vivado el .mem se copia
-        // junto al simulador, asi que si no esta ahi se usa solo el nombre
-        fd = $fopen("Programa4_Flushing/flushing.mem", "r");
-        if (fd) begin
-            $fclose(fd);
-            $readmemh("Programa4_Flushing/flushing.mem", dut.imem.RAM);
-        end else
-            $readmemh("flushing.mem", dut.imem.RAM);
-
-        #21;
-        reset = 0;
-
-        // Tiempo suficiente para ejecutar el programa
-        #300;
-
-        $display("===== RESULTADOS =====");
-
-        // Verificacion de registros
-        for (i = 1; i <= 16; i = i + 1)
-            if (dut.rvpipeline.dp.rf.rf[i] !== esperado[i]) begin
-                $display("ERROR: x%0d = %0d (esperado %0d)",
-                         i, dut.rvpipeline.dp.rf.rf[i], esperado[i]);
-                errores = errores + 1;
+      if (finishing == 0) begin
+        // Retiro en orden de programa: primero la via 0 y luego la via 1
+        if (ValidW0 === 1'b1) begin
+          if (retired < NT) begin
+            if (PCW0 !== trace[retired]) begin
+              $display("ERROR: retiro #%0d: PC=%h (esperado %h)", retired, PCW0, trace[retired]);
+              errors = errors + 1;
             end
-
-        // Comprobar dato escrito en memoria
-        if (dut.dmem.RAM[0] !== 32'd4)
-            errores = errores + 1;
-
-        // Deben observarse exactamente 3 flushes: beq tomado, jal y jalr
-        if (ciclos_flush != 3) begin
-            $display("ERROR: flushes = %0d (esperado 3)", ciclos_flush);
-            errores = errores + 1;
+          end
+          retired = retired + 1;
         end
-
-        // Ningun stall en este programa
-        if (ciclos_stall != 0) begin
-            $display("ERROR: Stall inesperado");
-            errores = errores + 1;
+        if (ValidW1 === 1'b1) begin
+          if (retired < NT) begin
+            if (PCW1 !== trace[retired]) begin
+              $display("ERROR: retiro #%0d: PC=%h (esperado %h)", retired, PCW1, trace[retired]);
+              errors = errors + 1;
+            end
+          end
+          retired = retired + 1;
         end
+        if (retired >= NT) begin
+          finishing = 1;
+          cycles_done = cycles;
+        end
+      end else begin
+        // Un ciclo despues del ultimo retiro: el Register File ya escribio todo
+        finishing = 2;
+        if (retired != NT) begin
+          $display("ERROR: se retiraron %0d instrucciones (esperado %0d)", retired, NT);
+          errors = errors + 1;
+        end
+        for (i = 1; i < 32; i = i + 1)
+          if (dut.rvpipeline.dp.rf.rf[i] !== exp_reg[i]) begin
+            $display("ERROR: x%0d = %0d (esperado %0d)", i, dut.rvpipeline.dp.rf.rf[i], exp_reg[i]);
+            errors = errors + 1;
+          end
+        for (i = 0; i < NM; i = i + 1)
+          if (dut.dmem.RAM[exp_maddr[i]] !== exp_mval[i]) begin
+            $display("ERROR: mem[%0d] = %0d (esperado %0d)", exp_maddr[i], dut.dmem.RAM[exp_maddr[i]], exp_mval[i]);
+            errors = errors + 1;
+          end
 
-        $display("Ciclos con flush: %0d", ciclos_flush);
-
-        if (errores == 0)
-            $display("PASS: Flushing correcto");
+        ipc100  = (retired * 100) / cycles_done;
+        util100 = (pairs * 100) / (pairs + singles + stalls + 1);
+        $display("=======================================================");
+        $display(" Programa            : flushing");
+        $display(" Instrucciones       : %0d", retired);
+        $display(" Ciclos              : %0d", cycles_done);
+        $display(" IPC                 : %0d.%02d", ipc100 / 100, ipc100 % 100);
+        $display(" Pares emitidos      : %0d   Individuales: %0d   Stalls: %0d   Flushes: %0d", pairs, singles, stalls, flushes);
+        if (errors == 0)
+          $display(" PASS: el programa se ejecuto correctamente");
         else
-            $display("FAIL: %0d errores", errores);
-
+          $display(" FAIL: %0d error(es)", errors);
+        $display("=======================================================");
         $finish;
+      end
     end
+  end
 
-    // Monitor de las senales de la Hazard Unit
-    // Se excluye el bucle final (beq en 0x4C), que salta a si mismo indefinidamente
-    always @(negedge clk) begin
-        if (!reset) begin
-
-            if (dut.rvpipeline.FlushD &&
-                dut.rvpipeline.dp.PCE != 32'h4C) begin
-
-                ciclos_flush = ciclos_flush + 1;
-
-                $display(
-                    "FLUSH t=%0t PCE=%h PCSrcE=%b FlushD=%b FlushE=%b",
-                    $time,
-                    dut.rvpipeline.dp.PCE,
-                    dut.rvpipeline.PCSrcE,
-                    dut.rvpipeline.FlushD,
-                    dut.rvpipeline.FlushE
-                );
-
-            end
-
-            if (dut.rvpipeline.StallF)
-                ciclos_stall = ciclos_stall + 1;
-        end
-    end
-
-    // Archivo de ondas para GTKWave o EPWave
-    initial begin
-        $dumpfile("flushing.vcd");
-        $dumpvars(0, tb_flushing);
-    end
+  // ---- Guarda de timeout ----
+  initial begin
+    #200000;
+    $display("TIMEOUT: se retiraron %0d de %0d instrucciones. Revisa el .mem y los nombres de instancia.", retired, NT);
+    $finish;
+  end
 
 endmodule
