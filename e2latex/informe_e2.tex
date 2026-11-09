@@ -874,4 +874,33 @@ La Tabla~\ref{tab:cmp} compara las arquitecturas A (Single-Issue) y B (Dual-Issu
 
 El mayor speedup aparece donde hay instrucciones independientes: 1.68 en el Programa~1 y 1.67 en el 6. El menor es el del benchmark, 1.15. En sus 110 instrucciones solo se retiraron 20 pares y 70 instrucciones sueltas, con 8 stalls y 17 flushes. Sus lazos tienen dependencias RAW encadenadas y terminan en \sig{beq} y \sig{jal} seguidos, que provocan flushes y no pueden emitirse juntos. Estas son las causas que impiden llegar al IPC ideal de 2.
 
+\subsection{Cómo reproducir las pruebas}
+
+Para simular cada programa se siguen los pasos del Anexo~A, con el código de \sig{Dual_Issue} o \sig{Single_Issue} y los archivos de la Tabla~\ref{tab:repro-e2}. En \sig{Single_Issue}, el testbench lleva el sufijo \sig{_single}.
+
+\begin{table}[htbp]
+\centering
+\caption{Archivos de cada programa de la Entrega 2.}
+\label{tab:repro-e2}
+\begin{tabular}{c l l l}
+\toprule
+\textbf{Programa} & \textbf{Carpeta} & \textbf{Testbench} & \textbf{Programa cargado} \\
+\midrule
+1 & \sig{Programa1_ISA} & \sig{tb_isa.v} & \sig{isa.mem} \\
+2 & \sig{Programa2_Forwarding} & \sig{tb_forwarding.v} & \sig{forwarding.mem} \\
+3 & \sig{Programa3_Stalling} & \sig{tb_stalling.v} & \sig{stalling.mem} \\
+4 & \sig{Programa4_Flushing} & \sig{tb_flushing.v} & \sig{flushing.mem} \\
+5 & \sig{Programa5_DualFetch} & \sig{tb_dualfetch.v} & \sig{dualfetch.mem} \\
+6 & \sig{Programa6_DosALU} & \sig{tb_dos_alu.v} & \sig{dos_alu.mem} \\
+7 & \sig{Programa7_RAW_Forwarding} & \sig{tb_raw_forwarding.v} & \sig{raw_forwarding.mem} \\
+8 & \sig{Programa8_Load_Memoria} & \sig{tb_load_memoria.v} & \sig{load_memoria.mem} \\
+9 & \sig{Programa9_Branches} & \sig{tb_branches.v} & \sig{branches.mem} \\
+10 & \sig{Programa10_Escrituras} & \sig{tb_escrituras.v} & \sig{escrituras.mem} \\
+11 & \sig{Programa11_Reagrupamiento} & \sig{tb_reagrupamiento.v} & \sig{reagrupamiento.mem} \\
+12 & \sig{Programa12_Benchmark} & \sig{tb_benchmark.v} & \sig{benchmark.mem} \\
+13 & \sig{Programa13_Casos_Via1} & \sig{tb_casos_via1.v} & \sig{casos_via1.mem} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \end{document}
