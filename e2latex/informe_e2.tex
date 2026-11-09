@@ -39,7 +39,8 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small Arquitectura de Computadoras --- Proyecto 2}
-\fancyhead[R]{\small Entrega E1}
+\newcommand{\entregaactual}{}
+\fancyhead[R]{\small \entregaactual}
 \fancyfoot[C]{\small \thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 
@@ -51,6 +52,18 @@
 \clubpenalty=10000
 
 \newcommand{\sig}[1]{\texttt{\detokenize{#1}}}
+
+% Titulo de cada entrega: aparece en el indice y en el encabezado de pagina
+\newcommand{\entrega}[1]{%
+  \clearpage
+  \gdef\entregaactual{#1}%
+  \phantomsection
+  \addcontentsline{toc}{part}{#1}%
+  {\LARGE\bfseries\color{acento} #1\par}
+  \vspace{4pt}
+}
+\renewcommand{\contentsname}{Índice}
+\setcounter{tocdepth}{1}
 
 \newtcolorbox{nota}[1]{colback=acento!4, colframe=acento!70, fonttitle=\bfseries\small,
   title={#1}, boxrule=0.6pt, arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt}
@@ -95,7 +108,7 @@
 % Encabezado
 % =====================================================================
 \begin{center}
-  {\LARGE\bfseries\color{acento} Proyecto 2 --- Entrega E1\par}
+  {\LARGE\bfseries\color{acento} Proyecto 2\par}
   \vspace{10pt}
   Aedo Farge, Gian Franco\\
   Colque Ordoñez, Patrick Fabrizio\\
@@ -104,9 +117,9 @@
   {\small Arquitectura de Computadoras, noviembre de 2026\par}
 \end{center}
 
-\begin{nota}{Resumen}
-Implementamos un pipeline RV32I de cinco etapas con forwarding, stalling y flushing, y lo verificamos con cuatro programas de prueba que pasan sus testbenches automáticos. En el camino encontramos y corregimos un error por el que \sig{jalr} no anulaba las instrucciones del camino incorrecto. Sobre ese pipeline empezamos la arquitectura Dual-Issue: el procesador ya lee y decodifica dos instrucciones por ciclo y tiene un Register File de cuatro lecturas y dos escrituras. También quedaron instanciados el registro ID/EX y la ALU de la segunda vía. Por ahora el procesador sigue emitiendo una instrucción por ciclo, en orden.
-\end{nota}
+\tableofcontents
+
+\entrega{Entrega 1}
 
 % =====================================================================
 \section{Organización del trabajo}
@@ -150,12 +163,28 @@ La Figura~\ref{fig:dp-single} muestra el datapath. Las señales llevan como sufi
 
 El multiplexor del PC tiene tres entradas: \sig{00} para \sig{PC+4}, \sig{01} para el destino de \sig{beq} y \sig{jal} (\sig{PCTargetE}) y \sig{10} para \sig{jalr}, cuyo destino es \sig{ALUResultE} con el bit~0 en cero. El Register File escribe en el flanco de bajada del reloj: así, una instrucción en WB escribe en la primera mitad del ciclo y la que está en ID lee el valor nuevo en la segunda mitad, lo que nos ahorra un caso de forwarding. Cuando el registro IF/ID se anula, se carga un NOP real (\sig{addi x0, x0, 0}) en lugar de ceros, para que el controller nunca decodifique una instrucción inválida.
 
+\begin{vlog}
+// PC: 00 = PC+4, 01 = PCTargetE, 10 = jalr (bit 0 en cero)
+mux3 #(WIDTH) pcmux(.d0(PCPlus4F), .d1(PCTargetE), .d2({ALUResultE[31:1], 1'b0}),
+                    .s(PCSrcE), .y(PCNextF));
+
+// Register File: escribe en el flanco de bajada
+always @(negedge clk)
+  if (we3) rf[a3] <= wd3;
+\end{vlog}
+
 \subsection{Unidad de control}
 
-El controller decodifica en ID con \sig{maindec} y \sig{aludec} y hace viajar cada señal con su instrucción hasta la etapa donde se usa. \sig{ImmSrc} se consume en ID; \sig{ALUSrc}, \sig{ALUControl}, \sig{Branch}, \sig{Jump} y \sig{Jalr} en EX; \sig{MemWrite} en MEM, y \sig{RegWrite} y \sig{ResultSrc} en WB. El salto se resuelve en EX con \texttt{PCSrcE = \{JalrE, (BranchE \& ZeroE) | JumpE\}}. El registro de control ID/EX se limpia con \sig{FlushE}, de modo que una instrucción anulada no escribe registros ni memoria. Respecto al procesador single-cycle original, añadimos la señal \sig{Jalr} a \sig{maindec} (la palabra de control pasó de 11 a 12 bits) para soportar \sig{jalr}.
+El controller decodifica en ID con \sig{maindec} y \sig{aludec} y hace viajar cada señal con su instrucción hasta la etapa donde se usa. \sig{ImmSrc} se consume en ID; \sig{ALUSrc}, \sig{ALUControl}, \sig{Branch}, \sig{Jump} y \sig{Jalr} en EX; \sig{MemWrite} en MEM, y \sig{RegWrite} y \sig{ResultSrc} en WB. El salto se resuelve en EX con \texttt{PCSrcE = \{JalrE, (BranchE \& ZeroE) | JumpE\}}. El registro de control ID/EX se limpia con \sig{FlushE}, de modo que una instrucción anulada no escribe registros ni memoria. Respecto al procesador single-cycle original, añadimos la señal \sig{Jalr} a \sig{maindec} (la palabra de control pasó de 11 a 12 bits) para soportar \sig{jalr}:
+
+\begin{vlog}
+7'b1100111: controls = 12'b1_00_1_0_10_0_00_0_1; // jalr, en maindec
+assign PCSrcE = {JalrE, (BranchE & ZeroE) | JumpE};
+\end{vlog}
 
 % =====================================================================
 \section{Hazard Unit}
+\label{sec:hazard}
 % =====================================================================
 
 La Hazard Unit (\sig{hazardunit.v}) se encarga de los tres tipos de riesgo del pipeline.
@@ -265,25 +294,35 @@ add  x6, x5, x4     # x6 = 35   (x5 desde MEM, x4 desde WB)
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{../img/prog2_forwarding.png}
-\caption{Programa 2, de 50 a 115~ns.}
+\includegraphics[width=\textwidth]{../img/prog2_forwarding_datos.png}
+\caption{Programa 2, de 50 a 115~ns. En amarillo, las señales agregadas para ver los datos, en decimal.}
 \label{fig:p2}
 \end{figure}
 
 Aquí cada instrucción necesita el resultado de la anterior antes de que llegue al Register File. La Tabla~\ref{tab:p2} resume lo que hace el forwarding en cada ciclo de la Figura~\ref{fig:p2}. Ninguna instrucción se detiene: sin forwarding, cada una habría esperado dos ciclos. \sig{ResultW} confirma los valores 15, 10, 25 y 35 entre los 80 y 110~ns.
 
+Para ver el dato que realmente usa la ALU agregamos a la waveform \sig{SrcAE}, \sig{SrcBE} y \sig{ALUResultM}. \sig{SrcAE} y \sig{SrcBE} son las salidas de los multiplexores de forwarding, que eligen el operando según \sig{ForwardAE} y \sig{ForwardBE}:
+
+\begin{vlog}
+// 00 = registro, 01 = ResultW (WB), 10 = ALUResultM (MEM)
+mux3 #(WIDTH) srcamux(.d0(RD1E), .d1(ResultW), .d2(ALUResultM), .s(ForwardAE), .y(SrcAE));
+\end{vlog}
+
+La selección la hace el código de la Sección~\ref{sec:hazard}, y \sig{SrcBE} se obtiene igual con \sig{ForwardBE}. Así, cada operando se comprueba en la Figura~\ref{fig:p2}: a los 60~ns, \sig{ForwardAE = 01} hace que \sig{SrcAE} tome el 5 de \sig{ResultW}, y \sig{ForwardBE = 10} hace que \sig{SrcBE} tome el 10 de \sig{ALUResultM}. La suma da el 15 que aparece en \sig{ALUResultM} a los 70~ns.
+
 \begin{table}[htbp]
 \centering
 \caption{Forwarding observado en el Programa 2.}
 \label{tab:p2}
-\begin{tabular}{c l c c l}
+\small
+\begin{tabular}{c l c c c c l}
 \toprule
-\textbf{Tiempo} & \textbf{En EX} & \sig{ForwardAE} & \sig{ForwardBE} & \textbf{De dónde vienen los operandos} \\
+\textbf{Tiempo} & \textbf{En EX} & \sig{ForwardAE} & \sig{ForwardBE} & \sig{SrcAE} & \sig{SrcBE} & \textbf{Origen de los operandos} \\
 \midrule
-60~ns & \sig{add x3, x1, x2} & 01 & 10 & \sig{x1} desde WB, \sig{x2} desde MEM \\
-70~ns & \sig{sub x4, x3, x1} & 10 & 00 & \sig{x3} desde MEM \\
-80~ns & \sig{add x5, x4, x3} & 10 & 01 & \sig{x4} desde MEM, \sig{x3} desde WB \\
-90~ns & \sig{add x6, x5, x4} & 10 & 01 & \sig{x5} desde MEM, \sig{x4} desde WB \\
+60~ns & \sig{add x3, x1, x2} & 01 & 10 & 5 & 10 & \sig{x1} desde WB, \sig{x2} desde MEM \\
+70~ns & \sig{sub x4, x3, x1} & 10 & 00 & 15 & 5 & \sig{x3} desde MEM, \sig{x1} del registro \\
+80~ns & \sig{add x5, x4, x3} & 10 & 01 & 10 & 15 & \sig{x4} desde MEM, \sig{x3} desde WB \\
+90~ns & \sig{add x6, x5, x4} & 10 & 01 & 25 & 10 & \sig{x5} desde MEM, \sig{x4} desde WB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -359,11 +398,29 @@ En esta entrega construimos la parte frontal del procesador Dual-Issue: leer y d
 
 \textbf{Dual Fetch.} A la memoria de instrucciones le agregamos un segundo puerto de lectura: \sig{rd} entrega la instrucción en \sig{PC} y \sig{rd1} la de \sig{PC+4}. Como en cada lectura llega un par, el PC avanza de 8 en 8. El PC se actualiza cuando el par que está en Decode ya terminó de emitirse o cuando hay un salto tomado.
 
+\begin{vlog}
+assign rd  = RAM[a[31:2]];     // imem: instruccion en PC
+assign rd1 = RAM[a[31:2] + 1]; // imem: instruccion en PC+4
+.en(~StallF & (SelD | FlushD)) // habilitacion del registro del PC
+\end{vlog}
+
 \textbf{Dual Decode.} El registro IF/ID ahora es doble y guarda \sig{InstrD0} (slot~0, la instrucción más antigua), \sig{InstrD1} (slot~1) y el PC base del par. El controller tiene dos decodificadores (dos \sig{maindec} y dos \sig{aludec}) y el datapath dos unidades \sig{extend}, así que ambas instrucciones se decodifican en el mismo ciclo. El Register File pasó a tener cuatro puertos de lectura y dos de escritura: lee \sig{rs1} y \sig{rs2} de las dos instrucciones a la vez. El segundo puerto de escritura ya existe y, si las dos vías escriben el mismo registro, gana la vía~1 por ser la instrucción más joven; lo conectaremos en E2.
+
+\begin{vlog}
+always @(negedge clk) begin
+  if (we3)  rf[a3] <= wd3;
+  if (web3) rf[b3] <= wdb3;   // va despues: tiene prioridad
+end
+\end{vlog}
 
 \textbf{Módulos de la vía 1.} También instanciamos el registro ID/EX de la vía 1 (\sig{regE1}, con los operandos, el inmediato y el control del slot~1) y su ALU (\sig{alu1}), con su propio multiplexor de \sig{ALUSrc}. En esta entrega la señal \sig{Issue1D} está fija en 0, de modo que ese registro se limpia en cada ciclo y la vía 1 solo procesa burbujas. En E2 la Issue Unit pondrá \sig{Issue1D} en 1 cuando las dos instrucciones del par puedan salir juntas.
 
 \textbf{Emisión.} Como E1 todavía no pide ejecutar dos instrucciones a la vez, emitimos una por ciclo y en orden. La señal \sig{SelD} elige el slot: con \sig{SelD = 0} sale la instrucción más antigua del par y con \sig{SelD = 1} la más joven; después entra el siguiente par. A EX pasan el control y los operandos del slot elegido. Esta idea de guardar la instrucción más joven para el ciclo siguiente es la base del reagrupamiento que hará la Issue Unit en E2. Ante un salto tomado se limpia el par en Decode, y si el salto estaba en el slot~0, la instrucción del slot~1 se anula con \sig{FlushE}.
+
+\begin{vlog}
+assign InstrD = SelD ? InstrD1 : InstrD0;   // slot que se emite
+assign PCD    = PCPairD + {SelD, 2'b00};
+\end{vlog}
 
 \begin{figure}[htbp]
 \centering
@@ -454,5 +511,7 @@ Los programas 1 a 4 comparten un mismo proyecto de Vivado. El Programa~5 necesit
 \end{enumerate}
 
 La waveform ya muestra \sig{PCF}, \sig{InstrF} a \sig{InstrW} y las señales de la Hazard Unit, porque el testbench las declara en su nivel superior, así que no hay que agregarlas a mano.
+
+\entrega{Entrega 2}
 
 \end{document}
