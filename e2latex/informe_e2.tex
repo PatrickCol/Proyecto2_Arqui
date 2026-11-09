@@ -514,4 +514,364 @@ La waveform ya muestra \sig{PCF}, \sig{InstrF} a \sig{InstrW} y las señales de 
 
 \entrega{Entrega 2}
 
+\renewcommand{\thesection}{\arabic{section}}
+\setcounter{section}{0}
+\renewcommand{\theHsection}{e2.\arabic{section}}
+
+% =====================================================================
+\section{Arquitectura Dual-Issue}
+% =====================================================================
+
+En esta entrega el procesador ya ejecuta dos instrucciones por ciclo cuando es posible. Conserva las cinco etapas y emite en orden: la instrucción más antigua (slot~0) va por la vía~0 y la más joven (slot~1) por la vía~1. Los sufijos 0 y 1 de las señales indican la vía. La Figura~\ref{fig:dp-e2} muestra el datapath completo.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\scriptsize,blk/.append style={font=\scriptsize},hz/.append style={font=\scriptsize}]
+  % Registros de pipeline
+  \foreach \x/\n in {3.15/{IF/ID},6.55/{ID/EX},10.85/{EX/MEM},13.75/{MEM/WB}}
+    \node[preg,minimum height=5.6cm,label={[font=\scriptsize\bfseries]above:\n}] at (\x,2.5) {};
+  % Etapas
+  \foreach \x/\n in {1.3/IF,4.85/ID,8.7/EX,12.3/MEM,15.1/WB}
+    \node[font=\scriptsize\bfseries,text=acento] at (\x,6.75) {\n};
+  % Fetch
+  \node[blk,minimum width=.8cm,minimum height=1cm] (pc) at (.45,2.5) {PC};
+  \node[blk,minimum width=1.25cm,minimum height=1.5cm] (imem) at (2.05,2.5) {IMEM\\2 lecturas};
+  \draw[dat] (pc) -- (imem);
+  \draw[dat] (imem.north) |- (3.03,4.2) node[lbl,pos=.75,above]{slot 0};
+  \draw[dat] (imem.south) |- (3.03,.8) node[lbl,pos=.75,below]{slot 1};
+  % Decode
+  \node[blk,minimum width=2cm,minimum height=.85cm] (d0) at (4.75,4.45) {maindec, aludec\\extend (slot 0)};
+  \node[blk,minimum width=2cm,minimum height=1.05cm] (rf) at (4.75,2.5) {Register File\\4 lect. / 2 escr.};
+  \node[blk,minimum width=2cm,minimum height=.85cm] (d1) at (4.75,.55) {maindec, aludec\\extend (slot 1)};
+  \draw[dat] (3.27,4.45) -- (d0);
+  \draw[dat] (3.27,.55) -- (d1);
+  \draw[dat] (3.27,2.8) -- (rf.west |- 0,2.8);
+  \draw[dat] (3.27,2.2) -- (rf.west |- 0,2.2);
+  \draw[dat] (d0) -- (6.43,4.45);
+  \draw[dat] (d1) -- (6.43,.55);
+  \draw[dat] (rf.east |- 0,2.85) -| (6.2,3.9) -- (6.43,3.9);
+  \draw[dat] (rf.east |- 0,2.15) -| (6.2,1.1) -- (6.43,1.1);
+  % Issue unit
+  \node[hz,minimum width=2.8cm,minimum height=.7cm] (iu) at (4.85,6.15) {Issue Unit\\\sig{Issue0}, \sig{Issue1}, \sig{Consumed}};
+  \draw[hzl] (d0.north) -- (d0.north |- iu.south);
+  \draw[hzl] (iu.west) -| (3.15,5.72);
+  \draw[hzl] (iu.east) -| (6.55,5.72);
+  % Execute
+  \node[mux,fill=blue!6] (m0) at (7.6,4.2) {};
+  \node[lbl,anchor=west] at (7.8,4.85) {mux5 (forwarding)};
+  \node[mux,fill=blue!6] (m1) at (7.6,.8) {};
+  \node[lbl,anchor=west] at (7.8,.15) {mux5 (forwarding)};
+  \node[blk,minimum width=1cm,minimum height=.9cm] (a0) at (9.4,4.2) {ALU 0};
+  \node[blk,minimum width=1.9cm,minimum height=.85cm,fill=orange!15] (br) at (9.4,2.5) {Resolutor único\\de saltos};
+  \node[blk,minimum width=1cm,minimum height=.9cm] (a1) at (9.4,.8) {ALU 1};
+  \draw[dat] (6.67,4.2) -- (m0);
+  \draw[dat] (6.67,.8) -- (m1);
+  \draw[dat] (m0) -- (a0);
+  \draw[dat] (m1) -- (a1);
+  \draw[dat] (a0) -- (10.73,4.2);
+  \draw[dat] (a1) -- (10.73,.8);
+  \draw[dat] (a0.south) -- (br.north);
+  \draw[dat] (a1.north) -- (br.south);
+  % Memory
+  \node[mux,minimum height=1.2cm,fill=orange!15] (mm) at (11.75,2.5) {};
+  \node[lbl,anchor=south] at (11.95,3.15) {\sig{MemSelM1}};
+  \node[blk,minimum width=1.05cm,minimum height=1.1cm,fill=orange!15] (dm) at (12.95,2.5) {DMEM\\1 puerto};
+  \draw[dat] (11.3,4.2) -- (11.3,2.8) -- (11.56,2.8);
+  \draw[dat] (11.3,.8) -- (11.3,2.2) -- (11.56,2.2);
+  \draw[dat] (mm) -- (dm);
+  \draw[dat] (10.97,4.2) -- (13.63,4.2);
+  \draw[dat] (10.97,.8) -- (13.63,.8);
+  \draw[dat] (dm) -- (13.63,2.5);
+  % Writeback
+  \node[mux,minimum height=1.1cm] (w0) at (14.85,4.2) {};
+  \node[mux,minimum height=1.1cm] (w1) at (14.85,.8) {};
+  \draw[dat] (13.87,4.2) -- (w0);
+  \draw[dat] (13.87,.8) -- (w1);
+  \draw[dat] (13.87,2.5) -- (14.3,2.5);
+  \draw[dat] (14.3,2.5) |- (14.66,3.95);
+  \draw[dat] (14.3,2.5) |- (14.66,1.05);
+  % Retorno al Register File
+  \draw[thick] (w0.east) -- (15.6,4.2) -- (15.6,-.5);
+  \draw[thick] (w1.east) -- (15.6,.8);
+  \draw[dat] (15.6,-.5) -- (5.95,-.5) -- (5.95,2.5) -- (rf.east |- 0,2.5);
+  \node[lbl,anchor=south] at (14.2,-.5) {\sig{ResultW0}, \sig{ResultW1}};
+  % Salto al PC
+  \draw[dat,red!60!black] (br.west) -- (8.15,2.5) -- (8.15,-.85) -- (.45,-.85) -- (pc.south);
+  \node[lbl,text=red!60!black,anchor=north] at (3.2,-.85) {\sig{PCTargetE} o destino de \sig{jalr}};
+  % Forwarding
+  \node[hz,minimum width=4.6cm,minimum height=.6cm] (hu) at (10.4,-1.5) {Hazard Unit: forwarding, load-use, flush};
+  \draw[fwd] (12.6,.8) -- (12.6,-1.4) -- (hu.east |- 0,-1.4);
+  \draw[fwd] (14.9,-.5) -- (14.9,-1.6) -- (hu.east |- 0,-1.6);
+  \node[lbl,text=blue!60!black,anchor=north] at (13.8,-1.65) {datos de MEM y WB};
+  \draw[fwd] (hu.west) -- (7.6,-1.5) -- (m1.south);
+  \draw[fwd] (7.6,-1.5) -- (7.0,-1.5) -- (7.0,5.1) -- (7.6,5.1) -- (m0.north);
+\end{tikzpicture}
+\caption{Datapath Dual-Issue completo. En naranja, los recursos compartidos: el resolutor de saltos y el puerto de memoria. Las flechas azules son el forwarding y la roja actualiza el PC ante un salto.}
+\label{fig:dp-e2}
+\end{figure}
+
+\textbf{Fetch.} Se leen siempre dos instrucciones consecutivas, y el PC avanza 4 bytes por cada instrucción consumida:
+
+\begin{vlog}
+adder pcadd(.a(PCF), .b({28'b0, Consumed, 2'b00}), .y(PCSeqF));
+\end{vlog}
+
+\textbf{IF/ID como ventana deslizante.} El registro guarda dos instrucciones y un bit de validez por slot. Reemplaza al \sig{SelD} de E1: si solo sale el slot~0, el slot~1 pasa a ser el slot~0 y se reagrupa con la instrucción siguiente:
+
+\begin{vlog}
+end else if (Consumed == 2'b10) begin       // salieron los dos slots
+  InstrD0_r <= InstrF;  InstrD1_r <= InstrF1;  PCD0_r <= PCF;
+end else if (Consumed == 2'b01) begin       // solo salio el slot 0
+  InstrD0_r <= InstrD1_r;  InstrD1_r <= InstrF;  PCD0_r <= PCD0_r + 4;
+end                                         // Consumed = 0: la ventana se congela
+\end{vlog}
+
+\textbf{Recursos por vía.} Hay dos ALU, dos registros ID/EX, EX/MEM y MEM/WB, y un Register File de cuatro lecturas y dos escrituras (Sección~5 de la Entrega~1). Si ambas vías escriben el mismo registro, gana la vía~1.
+
+\textbf{Recursos compartidos.} La memoria de datos tiene un solo puerto, y un multiplexor se lo entrega a la vía que tenga el load o store. También hay un solo resolutor de saltos, que toma el destino de la vía que tiene el salto:
+
+\begin{vlog}
+assign MemSelM1 = MemWriteM1 | (ResultSrcM1 == 2'b01);  // puerto de memoria
+wire   TakenL1  = |PCSrcE1;                             // destino del salto
+\end{vlog}
+
+\textbf{Controller.} Decodifica las dos instrucciones y lleva un registro de control por vía. Además informa a la Issue Unit qué registros usa cada instrucción, para no crear dependencias falsas: \sig{addi}, por ejemplo, no usa \sig{rs2}. La principal novedad respecto a E1 es que cada vía calcula su propio \sig{PCSrc}.
+
+\begin{table}[htbp]
+\centering
+\caption{Módulos nuevos y modificados respecto a E1.}
+\label{tab:modulos}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Módulo} & \textbf{Estado} & \textbf{Cambio} \\
+\midrule
+\sig{issueunit.v} & Nuevo & Decide la emisión y cuántos slots avanza la ventana. \\
+\sig{fwdsel.v} & Nuevo & Selector de forwarding de un operando. \\
+\sig{mux5.v} & Nuevo & Multiplexor de forwarding de cinco entradas. \\
+\sig{datapath.v} & Modificado & Ventana IF/ID, dos vías completas y puerto de memoria compartido. \\
+\sig{controller.v} & Modificado & Control por vía y datos para la Issue Unit. \\
+\sig{hazardunit.v} & Modificado & Cuatro forwardings, load-use por slot y flush por vía. \\
+\sig{riscvpipeline.v} & Modificado & Conecta la Issue Unit y las señales de las dos vías. \\
+\sig{imem.v}, \sig{dmem.v} & Modificado & Memorias ampliadas a 256 palabras. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Issue Unit}
+% =====================================================================
+
+La Issue Unit (\sig{issueunit.v}) decide en ID cuántas instrucciones del par salen en el ciclo. El slot~1 nunca sale sin el slot~0, así se conserva el orden del programa:
+
+\begin{vlog}
+assign RawPair = RegWriteD0 & (RdD0 != 5'b0) &
+                 ((UsesRs1D1 & (Rs1D1 == RdD0)) | (UsesRs2D1 & (Rs2D1 == RdD0)));
+assign MemConflict  = IsMemD0  & IsMemD1;
+assign CtrlConflict = IsCtrlD0 & IsCtrlD1;
+
+assign Issue0 = Valid0 & ~LoadUse0;
+assign Issue1 = Issue0 & Valid1 & ~LoadUse1 & ~RawPair & ~MemConflict & ~CtrlConflict;
+\end{vlog}
+
+\begin{table}[htbp]
+\centering
+\caption{Condiciones que impiden emitir el par.}
+\label{tab:issue}
+\begin{tabularx}{\textwidth}{l X l}
+\toprule
+\textbf{Señal} & \textbf{Condición} & \textbf{Efecto} \\
+\midrule
+\sig{RawPair} & El slot~1 lee el registro que escribe el slot~0. & Sale solo el slot~0 \\
+\sig{MemConflict} & Los dos son load o store: hay un solo puerto. & Sale solo el slot~0 \\
+\sig{CtrlConflict} & Los dos son saltos: hay un solo resolutor. & Sale solo el slot~0 \\
+\sig{LoadUse1} & El slot~1 usa el dato de un \sig{lw} que está en EX. & Sale solo el slot~0 \\
+\sig{LoadUse0} & El slot~0 usa el dato de un \sig{lw} que está en EX. & No sale ninguno \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Asignación de recursos.} La instrucción se queda en la vía de su slot, sin importar su tipo. Como ambas vías tienen ALU y acceso al puerto de memoria y al resolutor, una ALU puede salir junto con un load o store, o con un salto, en cualquier orden.
+
+\textbf{Reagrupamiento.} La señal \sig{Consumed} indica cuántas posiciones avanza la ventana. Un slot inválido cuenta como consumido, y por eso la ventana se recarga sola después de un reset o un flush:
+
+\begin{vlog}
+wire consumed0 = Issue0 | ~Valid0;
+wire consumed1 = Issue1 | ~Valid1;
+assign Consumed = consumed0 ? (consumed1 ? 2'b10 : 2'b01) : 2'b00;
+\end{vlog}
+
+% =====================================================================
+\section{Forwarding, stalls y control de saltos}
+% =====================================================================
+
+\textbf{Forwarding.} Cada uno de los cuatro operandos de EX tiene un multiplexor de cinco entradas y su propio selector. Cuando varios productores escriben el mismo registro, gana el más reciente: primero MEM y luego WB, y dentro de cada etapa, la vía~1:
+
+\begin{vlog}
+if      ((Rs != 5'b0) && RegWriteM1 && (Rs == RdM1)) Forward = 3'b100; // MEM via 1
+else if ((Rs != 5'b0) && RegWriteM0 && (Rs == RdM0)) Forward = 3'b011; // MEM via 0
+else if ((Rs != 5'b0) && RegWriteW1 && (Rs == RdW1)) Forward = 3'b010; // WB via 1
+else if ((Rs != 5'b0) && RegWriteW0 && (Rs == RdW0)) Forward = 3'b001; // WB via 0
+else                                                 Forward = 3'b000; // registro
+\end{vlog}
+
+\textbf{Stall por load-use.} El dato de un \sig{lw} recién está listo al final de MEM. Se compara cada slot en ID con los dos posibles \sig{lw} en EX; este es el caso del slot~0:
+
+\begin{vlog}
+assign LoadUse0 = (ldE0 & ((UsesRs1D0 & (Rs1D0 == RdE0)) | (UsesRs2D0 & (Rs2D0 == RdE0))))
+                | (ldE1 & ((UsesRs1D0 & (Rs1D0 == RdE1)) | (UsesRs2D0 & (Rs2D0 == RdE1))));
+\end{vlog}
+
+Si \sig{LoadUse0} vale 1, \sig{Consumed} es 0: el PC y la ventana se mantienen, y al no emitirse nada, EX recibe burbujas. Un salto tomado tiene prioridad sobre el stall.
+
+\textbf{Saltos y flush.} El salto se resuelve en EX, en cualquiera de las dos vías. Solo se anula lo más joven que el salto:
+
+\begin{vlog}
+assign FlushD  = taken0 | taken1;  // IF/ID
+assign FlushE  = taken0 | taken1;  // ID/EX de las dos vias
+assign FlushM1 = taken0;           // EX/MEM de la via 1
+\end{vlog}
+
+Si el salto está en la vía~0, la instrucción de la vía~1 es más joven y \sig{FlushM1} impide que llegue a MEM. Si está en la vía~1, la vía~0 es más antigua y continúa normalmente.
+
+% =====================================================================
+\section{Programas de prueba y waveforms}
+% =====================================================================
+
+Los programas de esta entrega están en \sig{Dual_Issue}. Cada testbench comprueba el orden de retiro con el PC de cada instrucción que llega a WB, los registros y la memoria finales, y un número mínimo de pares retirados. La Tabla~\ref{tab:prog-e2} los relaciona con lo que debe probarse. Las 13 pruebas dan PASS. En las waveforms, las señales en amarillo son datos en decimal.
+
+\begin{table}[htbp]
+\centering
+\caption{Programas de prueba de la Entrega 2.}
+\label{tab:prog-e2}
+\begin{tabularx}{\textwidth}{l X c}
+\toprule
+\textbf{Programa} & \textbf{Qué prueba} & \textbf{Figura} \\
+\midrule
+6 --- Dos ALU & Dos operaciones ALU independientes emitidas juntas & \ref{fig:e2p6} \\
+7 --- RAW y forwarding & RAW entre candidatas y forwarding entre vías y etapas & \ref{fig:e2p7} \\
+8 --- Load y memoria & Load-use y conflictos del puerto de memoria & \ref{fig:e2p8} \\
+9 --- Branches & Saltos tomados y no tomados, \sig{jal} y \sig{jalr} & --- \\
+10 --- Escrituras & Dos escrituras en el Register File y al mismo registro & \ref{fig:e2p10} \\
+11 --- Reagrupamiento & Emisión parcial, orden y ausencia de pérdidas o duplicados & \ref{fig:e2p11} \\
+12 --- Benchmark & Programa con lazos para comparar rendimiento & --- \\
+13 --- Casos vía 1 & Load-use en el slot~1; salto no tomado y \sig{jalr} en la vía~1 & \ref{fig:e2p13a}, \ref{fig:e2p13b} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Dos operaciones ALU juntas}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../img/e2_p6.png}
+\caption{Programa 6, de 55 a 115~ns.}
+\label{fig:e2p6}
+\end{figure}
+
+En la Figura~\ref{fig:e2p6}, \sig{Issue1} permanece en 1 y \sig{Consumed = 10}: sale un par en cada ciclo. A los 70~ns, Decode tiene \sig{add x9, x1, x2} y \sig{sub x10, x3, x4}. A los 80~ns ambas están en EX: la ALU~0 calcula $1+2=3$ y la ALU~1 calcula $3-4=-1$ (4294967295 en 32~bits). A los 100~ns \sig{ResultW0} y \sig{ResultW1} entregan esos dos resultados en el mismo ciclo.
+
+\subsection{RAW dentro del par y forwarding entre vías}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../img/e2_p7.png}
+\caption{Programa 7, de 35 a 75~ns.}
+\label{fig:e2p7}
+\end{figure}
+
+En la Figura~\ref{fig:e2p7}, a los 40~ns el par es \sig{add x3, x1, x2} y \sig{add x4, x3, x1}. La segunda necesita \sig{x3}, así que \sig{RawPair = 1}, \sig{Issue1 = 0} y \sig{Consumed = 01}. A los 50~ns, la \sig{add x4} ya está en el slot~0 y \sig{add x3} en EX recibe sus operandos de las dos vías de MEM: \sig{ForwardA0 = 011} da el 5 de \sig{ALUResultM0} y \sig{ForwardB0 = 100} da el 7 de \sig{ALUResultM1}. A los 60~ns, \sig{add x4} toma el 12 desde MEM y el 5 desde WB (\sig{ForwardB0 = 001}).
+
+\subsection{Conflicto de memoria y load-use}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../img/e2_p8.png}
+\caption{Programa 8, de 35 a 115~ns.}
+\label{fig:e2p8}
+\end{figure}
+
+En la Figura~\ref{fig:e2p8}, a los 40~ns el par son dos \sig{sw}: \sig{MemConflict = 1} y salen en ciclos distintos. A los 60~ns salen juntas \sig{lw x3} y \sig{add x4}, y a los 70~ns, en el orden inverso, \sig{add x5} y \sig{lw x6}, lo que muestra la memoria junto con la ALU en ambas posiciones. Por eso a los 90~ns \sig{MemSelM1 = 1}: el puerto es de la vía~1.
+
+A los 80~ns \sig{add x7, x6, x3} necesita el \sig{lw x6} que está en EX: \sig{LoadUse0 = 1}, \sig{Issue0 = 0} y \sig{Consumed = 00}. A los 90~ns el PC sigue en \sig{0x28}, Decode no cambió y EX tiene burbujas (\sig{InstrE0 = 0}). A los 100~ns, \sig{ForwardA0 = 010} entrega el 22 desde \sig{ResultW1}, que es el dato leído por la vía~1.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../img/e2_p13a.png}
+\caption{Programa 13, load-use en el slot 1, de 65 a 125~ns.}
+\label{fig:e2p13a}
+\end{figure}
+
+La Figura~\ref{fig:e2p13a} muestra el load-use en el slot~1. A los 70~ns, \sig{add x14, x3, x1} depende de \sig{lw x3}: \sig{LoadUse1 = 1}, pero el slot~0 es independiente y sale solo (\sig{Consumed = 01}). A los 90~ns, \sig{ForwardA0 = 001} entrega el 5 leído desde \sig{ResultW0}. A los 100~ns ocurre lo mismo con un \sig{lw} en la vía~1, y a los 120~ns el 9 llega por \sig{ResultW1} (\sig{ForwardB0 = 010}).
+
+\subsection{Saltos en ambas posiciones y flushing}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../img/e2_p13b.png}
+\caption{Programa 13, saltos, de 125 a 255~ns.}
+\label{fig:e2p13b}
+\end{figure}
+
+En la Figura~\ref{fig:e2p13b} aparecen los tres casos:
+\begin{itemize}
+\item \textbf{No tomado en la vía~1 (130~ns).} \sig{BranchE1 = 1} y \sig{ZeroE1 = 0}, porque $5 \neq 9$. No hay flush y el programa sigue.
+\item \textbf{Dos saltos en el par (140~ns).} \sig{beq} y \sig{jalr} levantan \sig{CtrlConflict}. Sale solo el \sig{beq}, que se toma a los 150~ns: \sig{FlushD} y \sig{FlushM1} anulan todo lo posterior. A los 190~ns ocurre otro salto tomado en la vía~0, y \sig{FlushM1} anula la \sig{addi x25} que iba en la vía~1.
+\item \textbf{\sig{jalr} en la vía~1 (230~ns).} \sig{JalrE1 = 1} y \sig{FlushD = 1}, pero \sig{FlushM1 = 0}: la \sig{addi x27} de la vía~0 es más antigua y continúa. El PC pasa a \sig{0x84} y a los 250~ns \sig{ResultW1} escribe el enlace 120 (\sig{0x74 + 4}).
+\end{itemize}
+
+\subsection{Dos escrituras en el Register File}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../img/e2_p10.png}
+\caption{Programa 10, de 55 a 105~ns.}
+\label{fig:e2p10}
+\end{figure}
+
+En la Figura~\ref{fig:e2p10}, \sig{RegWriteW0} y \sig{RegWriteW1} valen 1 a la vez: a los 60~ns se escriben \sig{x1 = 1} y \sig{x2 = 2} en el mismo ciclo. A los 80~ns las dos vías escriben \sig{x5} (5 y 6) y debe ganar la más joven. Justo entonces, \sig{add x7, x5, x6} está en EX y \sig{ForwardA0 = 010} le entrega el 6 de la vía~1. Además, \sig{ForwardB0 = 100} le entrega el 8 de la vía~1 de MEM, y no el 7 de la vía~0, por la misma prioridad.
+
+\subsection{Reagrupamiento y orden de retiro}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../img/e2_p11.png}
+\caption{Programa 11, de 25 a 105~ns. \sig{PCW = FFFFFFFC} indica que no se retira ninguna instrucción.}
+\label{fig:e2p11}
+\end{figure}
+
+En la Figura~\ref{fig:e2p11}, de 30 a 40~ns hay \sig{RawPair} y \sig{Consumed = 01}. \sig{InstrD1} pasa a \sig{InstrD0} en el ciclo siguiente y el PC avanza solo 4 (\sig{0x08} a \sig{0x0C}). A los 50~ns se forma un par nuevo con \sig{add x3} y \sig{addi x4}, instrucciones que no venían juntas de Fetch, y salen las dos (\sig{Consumed = 10}, el PC avanza 8). A los 90~ns un load-use congela la ventana (\sig{Consumed = 00}). \sig{PCW0} y \sig{PCW1} muestran el retiro en orden: \sig{0x00}, \sig{0x04}, el par \sig{0x08} y \sig{0x0C}, y luego \sig{0x10} y \sig{0x14}, sin pérdidas ni repeticiones.
+
+% =====================================================================
+\section{Comparación con el Single-Issue}
+% =====================================================================
+
+La Tabla~\ref{tab:cmp} compara las arquitecturas A (Single-Issue) y B (Dual-Issue) con los mismos programas. Los ciclos se cuentan igual en ambas, desde que baja el reset hasta que se retira la última instrucción del programa, y en los dos casos se comprueba el mismo resultado final.
+
+\begin{table}[htbp]
+\centering
+\caption{Ciclos e IPC preliminares. Speedup = ciclos A / ciclos B.}
+\label{tab:cmp}
+\begin{tabular}{l c c c c c c}
+\toprule
+\textbf{Programa} & \textbf{Instr.} & \textbf{Ciclos A} & \textbf{Ciclos B} & \textbf{IPC A} & \textbf{IPC B} & \textbf{Speedup} \\
+\midrule
+1 --- ISA & 29 & 32 & 19 & 0.91 & 1.53 & 1.68 \\
+2 --- Forwarding & 7 & 10 & 8 & 0.70 & 0.88 & 1.25 \\
+3 --- Stalling & 8 & 12 & 10 & 0.67 & 0.80 & 1.20 \\
+4 --- Flushing & 14 & 23 & 18 & 0.61 & 0.78 & 1.28 \\
+5 --- Dual Fetch & 11 & 16 & 11 & 0.69 & 1.00 & 1.45 \\
+6 --- Dos ALU & 17 & 20 & 12 & 0.85 & 1.42 & 1.67 \\
+7 --- RAW & 16 & 19 & 16 & 0.84 & 1.00 & 1.19 \\
+8 --- Load y memoria & 16 & 21 & 17 & 0.76 & 0.94 & 1.24 \\
+9 --- Branches & 19 & 30 & 23 & 0.63 & 0.83 & 1.30 \\
+10 --- Escrituras & 13 & 16 & 10 & 0.81 & 1.30 & 1.60 \\
+11 --- Reagrupamiento & 14 & 18 & 15 & 0.78 & 0.93 & 1.20 \\
+12 --- Benchmark & 110 & 153 & 133 & 0.72 & 0.83 & 1.15 \\
+13 --- Casos vía 1 & 34 & 46 & 31 & 0.74 & 1.10 & 1.48 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El mayor speedup aparece donde hay instrucciones independientes: 1.68 en el Programa~1 y 1.67 en el 6. El menor es el del benchmark, 1.15. En sus 110 instrucciones solo se retiraron 20 pares y 70 instrucciones sueltas, con 8 stalls y 17 flushes. Sus lazos tienen dependencias RAW encadenadas y terminan en \sig{beq} y \sig{jal} seguidos, que provocan flushes y no pueden emitirse juntos. Estas son las causas que impiden llegar al IPC ideal de 2.
+
 \end{document}
