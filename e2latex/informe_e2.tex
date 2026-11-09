@@ -295,7 +295,7 @@ add  x6, x5, x4     # x6 = 35   (x5 desde MEM, x4 desde WB)
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{../img/prog2_forwarding_datos.png}
-\caption{Programa 2, de 50 a 115~ns. En amarillo, las señales agregadas para ver los datos, en decimal.}
+\caption{Programa 2, de 50 a 115~ns. En amarillo, las señales agregadas para ver los datos, en decimal. Las instrucciones aparecen en ensamblador y \sig{ForwardAE} y \sig{ForwardBE} indican el origen del dato.}
 \label{fig:p2}
 \end{figure}
 
@@ -737,7 +737,7 @@ Si el salto está en la vía~0, la instrucción de la vía~1 es más joven y \si
 \section{Programas de prueba y waveforms}
 % =====================================================================
 
-Los programas de esta entrega están en \sig{Dual_Issue}. Cada testbench comprueba el orden de retiro con el PC de cada instrucción que llega a WB, los registros y la memoria finales, y un número mínimo de pares retirados. La Tabla~\ref{tab:prog-e2} los relaciona con lo que debe probarse. Las 13 pruebas dan PASS. En las waveforms, las señales en amarillo son datos en decimal.
+Los programas de esta entrega están en \sig{Dual_Issue}. Cada testbench comprueba el orden de retiro con el PC de cada instrucción que llega a WB, los registros y la memoria finales, y un número mínimo de pares retirados. La Tabla~\ref{tab:prog-e2} los relaciona con lo que debe probarse. Las 13 pruebas dan PASS. Para facilitar la lectura de las waveforms, las señales en amarillo son datos en decimal, las instrucciones aparecen en ensamblador (\sig{(burbuja)} es una etapa vacía) y cada señal \sig{Forward} indica también el origen del dato: \sig{reg}, \sig{WB0}, \sig{WB1}, \sig{MEM0} o \sig{MEM1}.
 
 \begin{table}[htbp]
 \centering
@@ -768,7 +768,7 @@ Los programas de esta entrega están en \sig{Dual_Issue}. Cada testbench comprue
 \label{fig:e2p6}
 \end{figure}
 
-En la Figura~\ref{fig:e2p6}, \sig{Issue1} permanece en 1 y \sig{Consumed = 10}: sale un par en cada ciclo. A los 70~ns, Decode tiene \sig{add x9, x1, x2} y \sig{sub x10, x3, x4}. A los 80~ns ambas están en EX: la ALU~0 calcula $1+2=3$ y la ALU~1 calcula $3-4=-1$ (4294967295 en 32~bits). A los 100~ns \sig{ResultW0} y \sig{ResultW1} entregan esos dos resultados en el mismo ciclo.
+En la Figura~\ref{fig:e2p6}, \sig{Issue1} permanece en 1 y \sig{Consumed = 10}: sale un par en cada ciclo. A los 70~ns, Decode tiene \sig{add x9, x1, x2} y \sig{sub x10, x3, x4}. A los 80~ns ambas están en EX: la ALU~0 calcula $1+2=3$ y la ALU~1 calcula $3-4=-1$. A los 100~ns \sig{ResultW0} y \sig{ResultW1} entregan esos dos resultados en el mismo ciclo.
 
 \subsection{RAW dentro del par y forwarding entre vías}
 
@@ -792,7 +792,7 @@ En la Figura~\ref{fig:e2p7}, a los 40~ns el par es \sig{add x3, x1, x2} y \sig{a
 
 En la Figura~\ref{fig:e2p8}, a los 40~ns el par son dos \sig{sw}: \sig{MemConflict = 1} y salen en ciclos distintos. A los 60~ns salen juntas \sig{lw x3} y \sig{add x4}, y a los 70~ns, en el orden inverso, \sig{add x5} y \sig{lw x6}, lo que muestra la memoria junto con la ALU en ambas posiciones. Por eso a los 90~ns \sig{MemSelM1 = 1}: el puerto es de la vía~1.
 
-A los 80~ns \sig{add x7, x6, x3} necesita el \sig{lw x6} que está en EX: \sig{LoadUse0 = 1}, \sig{Issue0 = 0} y \sig{Consumed = 00}. A los 90~ns el PC sigue en \sig{0x28}, Decode no cambió y EX tiene burbujas (\sig{InstrE0 = 0}). A los 100~ns, \sig{ForwardA0 = 010} entrega el 22 desde \sig{ResultW1}, que es el dato leído por la vía~1.
+A los 80~ns \sig{add x7, x6, x3} necesita el \sig{lw x6} que está en EX: \sig{LoadUse0 = 1}, \sig{Issue0 = 0} y \sig{Consumed = 00}. A los 90~ns el PC sigue en \sig{0x28}, Decode no cambió y EX tiene burbujas. A los 100~ns, \sig{ForwardA0 = 010} entrega el 22 desde \sig{ResultW1}, que es el dato leído por la vía~1.
 
 \begin{figure}[htbp]
 \centering
@@ -845,7 +845,7 @@ En la Figura~\ref{fig:e2p11}, de 30 a 40~ns hay \sig{RawPair} y \sig{Consumed = 
 \section{Comparación con el Single-Issue}
 % =====================================================================
 
-La Tabla~\ref{tab:cmp} compara las arquitecturas A (Single-Issue) y B (Dual-Issue) con los mismos programas. Los ciclos se cuentan igual en ambas, desde que baja el reset hasta que se retira la última instrucción del programa, y en los dos casos se comprueba el mismo resultado final.
+La Tabla~\ref{tab:cmp} compara las arquitecturas A (Single-Issue) y B (Dual-Issue) con los mismos programas. Los ciclos se cuentan igual en ambas, desde que baja el reset hasta que se retira la última instrucción del programa, y en los dos casos se comprueba el mismo resultado final. Los testbenches de la arquitectura A están en \sig{Single_Issue} con el sufijo \sig{_single}; ambas versiones se simulan con los pasos del Anexo~A.
 
 \begin{table}[htbp]
 \centering
