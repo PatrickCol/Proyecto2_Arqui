@@ -526,89 +526,11 @@ En esta entrega el procesador ya ejecuta dos instrucciones por ciclo cuando es p
 
 \begin{figure}[htbp]
 \centering
-\begin{tikzpicture}[x=1cm,y=1cm,font=\scriptsize,blk/.append style={font=\scriptsize},hz/.append style={font=\scriptsize}]
-  % Registros de pipeline
-  \foreach \x/\n in {3.15/{IF/ID},6.55/{ID/EX},10.85/{EX/MEM},13.75/{MEM/WB}}
-    \node[preg,minimum height=5.6cm,label={[font=\scriptsize\bfseries]above:\n}] at (\x,2.5) {};
-  % Etapas
-  \foreach \x/\n in {1.3/IF,4.85/ID,8.7/EX,12.3/MEM,15.1/WB}
-    \node[font=\scriptsize\bfseries,text=acento] at (\x,6.75) {\n};
-  % Fetch
-  \node[blk,minimum width=.8cm,minimum height=1cm] (pc) at (.45,2.5) {PC};
-  \node[blk,minimum width=1.25cm,minimum height=1.5cm] (imem) at (2.05,2.5) {IMEM\\2 lecturas};
-  \draw[dat] (pc) -- (imem);
-  \draw[dat] (imem.north) |- (3.03,4.2) node[lbl,pos=.75,above]{slot 0};
-  \draw[dat] (imem.south) |- (3.03,.8) node[lbl,pos=.75,below]{slot 1};
-  % Decode
-  \node[blk,minimum width=2cm,minimum height=.85cm] (d0) at (4.75,4.45) {maindec, aludec\\extend (slot 0)};
-  \node[blk,minimum width=2cm,minimum height=1.05cm] (rf) at (4.75,2.5) {Register File\\4 lect. / 2 escr.};
-  \node[blk,minimum width=2cm,minimum height=.85cm] (d1) at (4.75,.55) {maindec, aludec\\extend (slot 1)};
-  \draw[dat] (3.27,4.45) -- (d0);
-  \draw[dat] (3.27,.55) -- (d1);
-  \draw[dat] (3.27,2.8) -- (rf.west |- 0,2.8);
-  \draw[dat] (3.27,2.2) -- (rf.west |- 0,2.2);
-  \draw[dat] (d0) -- (6.43,4.45);
-  \draw[dat] (d1) -- (6.43,.55);
-  \draw[dat] (rf.east |- 0,2.85) -| (6.2,3.9) -- (6.43,3.9);
-  \draw[dat] (rf.east |- 0,2.15) -| (6.2,1.1) -- (6.43,1.1);
-  % Issue unit
-  \node[hz,minimum width=2.8cm,minimum height=.7cm] (iu) at (4.85,6.15) {Issue Unit\\\sig{Issue0}, \sig{Issue1}, \sig{Consumed}};
-  \draw[hzl] (d0.north) -- (d0.north |- iu.south);
-  \draw[hzl] (iu.west) -| (3.15,5.72);
-  \draw[hzl] (iu.east) -| (6.55,5.72);
-  % Execute
-  \node[mux,fill=blue!6] (m0) at (7.6,4.2) {};
-  \node[lbl,anchor=west] at (7.8,4.85) {mux5 (forwarding)};
-  \node[mux,fill=blue!6] (m1) at (7.6,.8) {};
-  \node[lbl,anchor=west] at (7.8,.15) {mux5 (forwarding)};
-  \node[blk,minimum width=1cm,minimum height=.9cm] (a0) at (9.4,4.2) {ALU 0};
-  \node[blk,minimum width=1.9cm,minimum height=.85cm,fill=orange!15] (br) at (9.4,2.5) {Resolutor único\\de saltos};
-  \node[blk,minimum width=1cm,minimum height=.9cm] (a1) at (9.4,.8) {ALU 1};
-  \draw[dat] (6.67,4.2) -- (m0);
-  \draw[dat] (6.67,.8) -- (m1);
-  \draw[dat] (m0) -- (a0);
-  \draw[dat] (m1) -- (a1);
-  \draw[dat] (a0) -- (10.73,4.2);
-  \draw[dat] (a1) -- (10.73,.8);
-  \draw[dat] (a0.south) -- (br.north);
-  \draw[dat] (a1.north) -- (br.south);
-  % Memory
-  \node[mux,minimum height=1.2cm,fill=orange!15] (mm) at (11.75,2.5) {};
-  \node[lbl,anchor=south] at (11.95,3.15) {\sig{MemSelM1}};
-  \node[blk,minimum width=1.05cm,minimum height=1.1cm,fill=orange!15] (dm) at (12.95,2.5) {DMEM\\1 puerto};
-  \draw[dat] (11.3,4.2) -- (11.3,2.8) -- (11.56,2.8);
-  \draw[dat] (11.3,.8) -- (11.3,2.2) -- (11.56,2.2);
-  \draw[dat] (mm) -- (dm);
-  \draw[dat] (10.97,4.2) -- (13.63,4.2);
-  \draw[dat] (10.97,.8) -- (13.63,.8);
-  \draw[dat] (dm) -- (13.63,2.5);
-  % Writeback
-  \node[mux,minimum height=1.1cm] (w0) at (14.85,4.2) {};
-  \node[mux,minimum height=1.1cm] (w1) at (14.85,.8) {};
-  \draw[dat] (13.87,4.2) -- (w0);
-  \draw[dat] (13.87,.8) -- (w1);
-  \draw[dat] (13.87,2.5) -- (14.3,2.5);
-  \draw[dat] (14.3,2.5) |- (14.66,3.95);
-  \draw[dat] (14.3,2.5) |- (14.66,1.05);
-  % Retorno al Register File
-  \draw[thick] (w0.east) -- (15.6,4.2) -- (15.6,-.5);
-  \draw[thick] (w1.east) -- (15.6,.8);
-  \draw[dat] (15.6,-.5) -- (5.95,-.5) -- (5.95,2.5) -- (rf.east |- 0,2.5);
-  \node[lbl,anchor=south] at (14.2,-.5) {\sig{ResultW0}, \sig{ResultW1}};
-  % Salto al PC
-  \draw[dat,red!60!black] (br.west) -- (8.15,2.5) -- (8.15,-.85) -- (.45,-.85) -- (pc.south);
-  \node[lbl,text=red!60!black,anchor=north] at (3.2,-.85) {\sig{PCTargetE} o destino de \sig{jalr}};
-  % Forwarding
-  \node[hz,minimum width=4.6cm,minimum height=.6cm] (hu) at (10.4,-1.5) {Hazard Unit: forwarding, load-use, flush};
-  \draw[fwd] (12.6,.8) -- (12.6,-1.4) -- (hu.east |- 0,-1.4);
-  \draw[fwd] (14.9,-.5) -- (14.9,-1.6) -- (hu.east |- 0,-1.6);
-  \node[lbl,text=blue!60!black,anchor=north] at (13.8,-1.65) {datos de MEM y WB};
-  \draw[fwd] (hu.west) -- (7.6,-1.5) -- (m1.south);
-  \draw[fwd] (7.6,-1.5) -- (7.0,-1.5) -- (7.0,5.1) -- (7.6,5.1) -- (m0.north);
-\end{tikzpicture}
-\caption{Datapath Dual-Issue completo. En naranja, los recursos compartidos: el resolutor de saltos y el puerto de memoria. Las flechas azules son el forwarding y la roja actualiza el PC ante un salto.}
+\includegraphics[width=\textwidth]{../img/datapath_dual_issue_e2.pdf}
+\caption{Datapath Dual-Issue completo. Arriba la vía~0 (blanco) y abajo la vía~1 (celeste), cada una con sus propios registros ID/EX, EX/MEM y MEM/WB; el registro IF/ID guarda el par de instrucciones. En naranja, la Issue Unit, la Hazard Unit y lo que comparten las dos vías: el resolutor de saltos y la memoria de datos. En verde, los caminos de forwarding.}
 \label{fig:dp-e2}
 \end{figure}
+
 
 \textbf{Fetch.} Se leen siempre dos instrucciones consecutivas, y el PC avanza 4 bytes por cada instrucción consumida:
 
@@ -656,6 +578,7 @@ wire   TakenL1  = |PCSrcE1;                             // destino del salto
 \bottomrule
 \end{tabularx}
 \end{table}
+
 
 % =====================================================================
 \section{Issue Unit}
