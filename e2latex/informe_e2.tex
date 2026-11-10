@@ -424,7 +424,7 @@ assign PCD    = PCPairD + {SelD, 2'b00};
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{../img/datapath_dual_issue_v2.png}
+\includegraphics[width=\textwidth]{../img/datapath_dual_issue_v2.jpg}
 \caption{Datapath Dual-Issue preliminar. Arriba la vía~0 y abajo la vía~1; cada registro de pipeline está partido en una sección por vía. En blanco, lo que se mantiene del Single-Issue (Figura~\ref{fig:dp-single}); en celeste, lo agregado en E1 para leer y decodificar el par; en gris punteado, la vía~1 después de Decode, que ya tiene su registro ID/EX y su ALU pero en E1 solo recibe burbujas.}
 \label{fig:dp-dual}
 \end{figure}
