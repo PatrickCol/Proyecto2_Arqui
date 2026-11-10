@@ -684,6 +684,27 @@ Los programas de esta entrega están en \sig{Dual_Issue}. Cada testbench comprue
 
 \subsection{Dos operaciones ALU juntas}
 
+\begin{asm}
+# Programa 6: dos ALU independientes salen juntas (Issue1 = 1)
+        addi x1, x0, 1
+        addi x2, x0, 2
+        addi x3, x0, 3
+        addi x4, x0, 4
+        addi x5, x0, 5
+        addi x6, x0, 6
+        addi x7, x0, 7
+        addi x8, x0, 8
+        add  x9, x1, x2
+        sub  x10, x3, x4
+        and  x11, x5, x6
+        or   x12, x7, x8
+        xor  x13, x1, x3
+        slt  x14, x2, x4
+        addi x15, x5, 10
+        addi x16, x6, 20
+fin:    beq  x0, x0, fin
+\end{asm}
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{../img/e2_p6.png}
@@ -695,6 +716,26 @@ En la Figura~\ref{fig:e2p6}, \sig{Issue1} permanece en 1 y \sig{Consumed = 10}: 
 
 \subsection{RAW dentro del par y forwarding entre vías}
 
+\begin{asm}
+# RAW dentro del par (no se emparejan) y forwarding entre vias y etapas
+        addi x1, x0, 5
+        addi x2, x0, 7
+        add  x3, x1, x2        # usa x1 y x2 recien calculados: forwarding
+        add  x4, x3, x1        # RAW con la instruccion anterior (x3)
+        sub  x5, x4, x3
+        and  x6, x5, x4
+        or   x7, x6, x5
+        xor  x8, x7, x6
+        slt  x9, x8, x7
+        addi x10, x0, 10       # dos escrituras al mismo registro: gana la mas joven
+        addi x10, x0, 20
+        add  x11, x10, x10     # debe leer 20
+        add  x12, x11, x9
+        add  x13, x12, x11
+        sw   x13, 0(x0)
+fin:    beq  x0, x0, fin
+\end{asm}
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{../img/e2_p7.png}
@@ -705,6 +746,26 @@ En la Figura~\ref{fig:e2p6}, \sig{Issue1} permanece en 1 y \sig{Consumed = 10}: 
 En la Figura~\ref{fig:e2p7}, a los 40~ns el par es \sig{add x3, x1, x2} y \sig{add x4, x3, x1}. La segunda necesita \sig{x3}, así que \sig{RawPair = 1}, \sig{Issue1 = 0} y \sig{Consumed = 01}. A los 50~ns, la \sig{add x4} ya está en el slot~0 y \sig{add x3} en EX recibe sus operandos de las dos vías de MEM: \sig{ForwardA0 = 011} da el 5 de \sig{ALUResultM0} y \sig{ForwardB0 = 100} da el 7 de \sig{ALUResultM1}. A los 60~ns, \sig{add x4} toma el 12 desde MEM y el 5 desde WB (\sig{ForwardB0 = 001}).
 
 \subsection{Conflicto de memoria y load-use}
+
+\begin{asm}
+# load-use y conflictos del puerto de memoria
+        addi x1, x0, 11
+        addi x2, x0, 22
+        sw   x1, 0(x0)
+        sw   x2, 4(x0)         # sw + sw: un solo puerto, no se emparejan
+        lw   x3, 0(x0)
+        add  x4, x1, x2        # lw + ALU independiente: pueden salir juntas
+        add  x5, x1, x1
+        lw   x6, 4(x0)         # ALU + lw: tambien en el otro orden
+        add  x7, x6, x3        # load-use: depende del lw anterior
+        sub  x8, x7, x3
+        sw   x8, 8(x0)
+        lw   x9, 8(x0)
+        addi x10, x9, 1        # load-use inmediato
+        add  x11, x10, x4
+        sw   x11, 12(x0)
+fin:    beq  x0, x0, fin
+\end{asm}
 
 \begin{figure}[htbp]
 \centering
@@ -728,6 +789,39 @@ La Figura~\ref{fig:e2p13a} muestra el load-use en el slot~1. A los 70~ns, \sig{a
 
 \subsection{Saltos en ambas posiciones y flushing}
 
+\begin{asm}
+# branches en cualquiera de las dos posiciones del par, tomados y no tomados, jal y jalr
+        addi x1, x0, 1
+        addi x2, x0, 1
+        addi x3, x0, 2
+        beq  x1, x3, ta        # no tomado
+        addi x4, x0, 4
+        beq  x1, x2, tb        # tomado: se anula solo lo mas joven
+        addi x5, x0, 99
+        addi x6, x0, 99
+tb:     addi x7, x0, 7
+        addi x8, x0, 8
+        beq  x7, x8, tc        # no tomado
+        addi x9, x0, 9
+        nop
+        beq  x1, x2, td        # tomado (otra posicion dentro del par)
+        addi x11, x0, 99
+        addi x12, x0, 99
+ta:     addi x13, x0, 99
+tc:     addi x14, x0, 99
+td:     addi x15, x0, 15
+        jal  x16, te           # salto incondicional
+        addi x17, x0, 99
+        addi x18, x0, 99
+te:     addi x19, x0, 104
+        jalr x20, 0(x19)       # salto indirecto
+        addi x21, x0, 99
+        addi x22, x0, 99
+tf:     addi x23, x0, 23
+        sw   x23, 0(x0)
+fin:    beq  x0, x0, fin
+\end{asm}
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{../img/e2_p13b.png}
@@ -744,6 +838,23 @@ En la Figura~\ref{fig:e2p13b} aparecen los tres casos:
 
 \subsection{Dos escrituras en el Register File}
 
+\begin{asm}
+# dos escrituras al Register File por ciclo y escrituras al mismo registro
+        addi x1, x0, 1         # x1 y x2 se escriben en el mismo ciclo (puertos 0 y 2)
+        addi x2, x0, 2
+        addi x3, x0, 3
+        addi x4, x0, 4
+        addi x5, x0, 5         # WAW: dos escrituras al mismo registro; gana la mas joven
+        addi x5, x0, 6
+        addi x6, x0, 7
+        addi x6, x0, 8
+        add  x7, x5, x6        # 6 + 8
+        add  x8, x1, x2
+        sw   x7, 0(x0)
+        sw   x8, 4(x0)
+fin:    beq  x0, x0, fin
+\end{asm}
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{../img/e2_p10.png}
@@ -754,6 +865,24 @@ En la Figura~\ref{fig:e2p13b} aparecen los tres casos:
 En la Figura~\ref{fig:e2p10}, \sig{RegWriteW0} y \sig{RegWriteW1} valen 1 a la vez: a los 60~ns se escriben \sig{x1 = 1} y \sig{x2 = 2} en el mismo ciclo. A los 80~ns las dos vías escriben \sig{x5} (5 y 6) y debe ganar la más joven. Justo entonces, \sig{add x7, x5, x6} está en EX y \sig{ForwardA0 = 010} le entrega el 6 de la vía~1. Además, \sig{ForwardB0 = 100} le entrega el 8 de la vía~1 de MEM, y no el 7 de la vía~0, por la misma prioridad.
 
 \subsection{Reagrupamiento y orden de retiro}
+
+\begin{asm}
+# emision parcial y reagrupamiento (orden preservado, sin instrucciones perdidas ni repetidas)
+        addi x1, x0, 3
+        add  x2, x1, x1        # RAW: sale sola, la siguiente se reagrupa
+        add  x3, x2, x1
+        addi x4, x0, 4         # independiente: puede emparejarse con la anterior
+        add  x5, x4, x3
+        sw   x5, 0(x0)
+        lw   x6, 0(x0)
+        sw   x6, 4(x0)         # RAW + memoria
+        addi x7, x0, 7
+        addi x8, x0, 8
+        add  x9, x7, x8
+        sub  x10, x9, x7
+        sw   x10, 8(x0)
+fin:    beq  x0, x0, fin
+\end{asm}
 
 \begin{figure}[htbp]
 \centering
