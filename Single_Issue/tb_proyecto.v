@@ -11,6 +11,7 @@
 // Para el pipeline single-issue (A): define SINGLE y ajusta el bloque de macros de abajo.
 // =====================================================================================
 `timescale 1ns/1ps
+`define SINGLE   // carpeta Single_Issue: arquitectura A
 module tb_proyecto;
   localparam [31:0] PC_A = 32'h34, PC_B = 32'h60, PC_C = 32'hE0, PC_D = 32'h160; // PC del ultimo sw de cada etapa
   localparam integer RET_A = 14, RET_B = 25, RET_C = 241, RET_D = 312;           // retiradas esperadas (emulador ISA)
@@ -36,11 +37,12 @@ module tb_proyecto;
   `define RES1 dut.rvpipeline.dp.ResultW1
 `else
   // Pipeline single-issue: una sola via. Pon aqui TUS senales de WB (valida, PC, RegWrite, Rd, ResultW).
-  `define V0   dut.rvpipeline.ValidW
-  `define PC0  dut.rvpipeline.PCW
+  // Retiro = instruccion valida en WB: burbujas/flush tienen PCPlus4W = 0 (mismo criterio que los TB de E2)
+  `define V0   (dut.rvpipeline.dp.PCPlus4W != 32'd0)
+  `define PC0  (dut.rvpipeline.dp.PCPlus4W - 32'd4)
   `define RW0  dut.rvpipeline.RegWriteW
   `define RD0  dut.rvpipeline.RdW
-  `define RES0 dut.rvpipeline.ResultW
+  `define RES0 dut.rvpipeline.dp.ResultW
   `define V1   1'b0
   `define PC1  32'hFFFFFFFF
   `define RW1  1'b0

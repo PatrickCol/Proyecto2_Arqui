@@ -27,3 +27,24 @@ Cada testbench verifica orden de retiro, registros, memoria y un mínimo de pare
 | Programa11_Reagrupamiento | Emisión parcial, reagrupamiento y orden |
 | Programa12_Benchmark | Lazos: comparación de ciclos e IPC |
 | Programa13_Casos_Via1 | Load-Use en slot 1, branch no tomado y jalr en vía 1, x0 |
+
+## Etapa 3 — Dual-Issue optimizado (arquitectura C): memoria de datos de doble puerto
+
+La Issue Unit ya no separa un par por `MemConflict`: cada vía tiene su puerto en `dmem`
+(`we0/a0/wd0/rd0` y `we1/a1/wd1/rd1`). Casos dentro del par a la misma dirección:
+sw(vía 0)+lw(vía 1) → bypass interno; lw(vía 0)+sw(vía 1) → el lw lee el valor anterior;
+sw+sw → gana la vía 1 (más joven).
+
+| Programa | Prueba |
+|---|---|
+| Programa1–13 | Mismos testbenches de E2 (regresión) |
+| Programa14_DoblePuerto | Casos del doble puerto: sw+sw, lw+lw, sw+lw y lw+sw misma dirección, sw+sw misma dirección |
+| Programa15_Propio | Programa propio: suma de vectores, ordenamiento burbuja y rango |
+| tb_proyecto.v + riscvtest.dat | Programa del profesor (etapas A–D) |
+
+Ciclos (A: Single-Issue / B: Dual-Issue / C: optimizado), mismo criterio, sin el bucle `fin`:
+
+| Programa | A | B | C |
+|---|---|---|---|
+| Profesor (312 instr.) | 459 | 387 | 384 |
+| Programa15_Propio (507 instr.) | 726 | 652 | 589 |
