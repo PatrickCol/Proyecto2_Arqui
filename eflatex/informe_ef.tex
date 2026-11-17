@@ -1420,11 +1420,11 @@ Ninguna de estas causas tiene que ver con la memoria. Por eso la optimización n
 El código de cada arquitectura está en su carpeta: \sig{Single_Issue} (A), \sig{Dual_Issue} (B) y \sig{Dual_Issue optimizado} (C). En Vivado se siguen los pasos del Anexo~A de la Entrega~1 con los archivos de la Tabla~\ref{tab:repro-ef}. Con Icarus Verilog, desde la carpeta del programa:
 
 \begin{cmd}
-iverilog -g2012 -o sim ../*.v tb_propio.v     # en Single_Issue: tb_propio_single.v
+iverilog -g2012 -s tb_propio -o sim ../*.v tb_propio.v   # en A: tb_propio_single
 vvp sim                                       # imprime ciclos, IPC y PASS / FAIL
 \end{cmd}
 
-Para el programa del profesor se compila la carpeta de la arquitectura con \sig{tb_proyecto.v}, y \sig{riscvtest.dat} se agrega como simulation source. Las waveforms de este informe se generaron con GTKWave a partir de estas mismas simulaciones.
+Con \sig{-s} se indica el testbench raíz; sin esa opción, Icarus también toma \sig{tb_proyecto.v} de la carpeta. Para el programa del profesor, desde la carpeta de la arquitectura: \sig{iverilog -g2012 -s tb_proyecto -o sim *.v}. En Vivado, \sig{riscvtest.dat} se agrega como simulation source. Las waveforms de este informe se generaron con GTKWave a partir de estas mismas simulaciones.
 
 \begin{table}[htbp]
 \centering
