@@ -989,7 +989,7 @@ Programa propio (Programa~15) & 507 & 726 & 652 & 589 & 1.107 \\
 
 En B la memoria de datos tiene un solo puerto. Si las dos instrucciones del par son \sig{lw} o \sig{sw}, la Issue Unit activa \sig{MemConflict} y solo sale el slot~0; el slot~1 se reagrupa con la instrucción siguiente (Sección~2 de la Entrega~2). Es un conflicto estructural: las instrucciones no dependen entre sí, solo compiten por el puerto.
 
-Este caso es frecuente en código que recorre arreglos: cargar dos elementos para operarlos, copiar o intercambiar valores, o guardar varios resultados seguidos. En el programa propio, B separa 65 pares de este tipo, y cada uno cuesta un ciclo.
+Este caso es frecuente en código que recorre arreglos: cargar dos elementos para operarlos, copiar o intercambiar valores, o guardar varios resultados seguidos. En el programa propio, B separa 73 pares de este tipo, y cada uno puede costar un ciclo.
 
 \subsection{Propuesta y justificación}
 
@@ -1075,7 +1075,7 @@ La Figura~\ref{fig:ef-mem} compara la etapa MEM de B y de C. En B, dos multiplex
 \label{fig:ef-mem}
 \end{figure}
 
-\textbf{Memoria de datos (\sig{dmem.v}).} Es el cambio central. Tiene dos puertos y resuelve dentro del módulo los casos de la Tabla~\ref{tab:ef-casos}:
+\textbf{Memoria de datos (\sig{dmem.v}).} Tiene dos puertos y resuelve dentro del módulo los casos de la Tabla~\ref{tab:ef-casos}:
 
 \begin{vlog}
 module dmem(input         clk, we0, we1,
@@ -1311,7 +1311,7 @@ En la Figura~\ref{fig:ef-finc}, a los 3850~ns se escribe \sig{M_52 = 1} (el últ
 \label{fig:ef-raw}
 \end{figure}
 
-En la Figura~\ref{fig:ef-raw}, los siete primeros pares de la etapa A salen completos (\sig{Issue1 = 1}, \sig{Consumed = 10}). A los 50~ns están en Decode \sig{add x5,x3,x4} y \sig{sub x6,x3,x4}, que usan \sig{x3} y \sig{x4} del par anterior. A los 60~ns están en EX: \sig{ForwardA0 = 011} trae \sig{x3 = 8} desde \sig{ALUResultM0} y \sig{ForwardB0 = 100} trae \sig{x4 = 3} desde \sig{ALUResultM1}. Así se ve el forwarding entre vías: \sig{SrcAE0 = 8} y \sig{SrcBE0 = 3}. A los 70~ns, \sig{add x7,x5,x6} recibe 11 y 5 de la misma forma. A los 100~ns, \sig{add x12,x11,x6} depende del \sig{lw x11} del mismo par: \sig{RawPair = 1} y solo sale el slot~0 (\sig{Consumed = 01}).
+En la Figura~\ref{fig:ef-raw}, los siete primeros pares de la etapa A salen completos (\sig{Issue1 = 1}, \sig{Consumed = 10}). A los 50~ns están en Decode \sig{add x5,x3,x4} y \sig{sub x6,x3,x4}, que usan \sig{x3} y \sig{x4} del par anterior. A los 60~ns están en EX: \sig{ForwardA0 = 011} trae \sig{x3 = 8} desde \sig{ALUResultM0} y \sig{ForwardB0 = 100} trae \sig{x4 = 3} desde \sig{ALUResultM1}. Con ese forwarding entre vías, \sig{SrcAE0 = 8} y \sig{SrcBE0 = 3}. A los 70~ns, \sig{add x7,x5,x6} recibe 11 y 5 de la misma forma. A los 100~ns, \sig{add x12,x11,x6} depende del \sig{lw x11} del mismo par: \sig{RawPair = 1} y solo sale el slot~0 (\sig{Consumed = 01}).
 
 \subsection{Caso clave 2: memoria y load-use, B frente a C}
 
@@ -1360,7 +1360,7 @@ Propio   & A & 507 & 726 & 0.698 & 1.432 & 1.000 & 0.898 \\
 
 \begin{table}[htbp]
 \centering
-\caption{Métricas adicionales de B y C. En el programa del profesor, por ciclo de Decode (un ciclo puede sumar a varias causas); en el propio, por instrucciones retiradas.}
+\caption{Métricas adicionales de B y C. En el programa del profesor, por ciclo de Decode (un ciclo puede sumar a varias causas); en el propio, por instrucciones retiradas, salvo los pares rotos por memoria, que también se cuentan por ciclo de Decode.}
 \label{tab:ef-metricas}
 \begin{tabular}{l c c c c}
 \toprule
@@ -1369,7 +1369,7 @@ Propio   & A & 507 & 726 & 0.698 & 1.432 & 1.000 & 0.898 \\
 \midrule
 Ciclos con doble emisión / pares retirados & 196 & 200 & 78 & 137 \\
 Pares mem+mem emitidos juntos & 0 & 4 & 0 & 65 \\
-Pares rotos por conflicto de memoria & 6 & 0 & --- & --- \\
+Pares rotos por conflicto de memoria & 6 & 0 & 73 & 0 \\
 Pares rotos por RAW & 104 & 103 & --- & --- \\
 Stalls por load-use & 10 & 10 & 54 & 50 \\
 Flushes por salto tomado & 68 & 68 & 84 & 84 \\
@@ -1384,18 +1384,18 @@ Ciclos sin instrucción válida en Decode & 69 & 69 & --- & --- \\
 
 \textbf{Dual-Issue frente al pipeline.} B es 1.19 veces más rápido que A en el programa del profesor y 1.11 en el propio. La mejora viene de los ciclos en que salen dos instrucciones independientes: 196 en el programa del profesor.
 
-\textbf{Por qué no se llega al IPC ideal de 2.} En el programa del profesor, el IPC de C es 0.81. Hay tres causas principales, todas visibles en la Tabla~\ref{tab:ef-metricas}:
+\textbf{Por qué no se llega al IPC ideal de 2.} En el programa del profesor, el IPC de C es 0.81. Las causas principales se ven en la Tabla~\ref{tab:ef-metricas}:
 \begin{itemize}
-  \item \textbf{Saltos tomados.} 68 flushes, uno por cada vuelta de los lazos de las etapas C y D. Cada uno anula el par que venía detrás, y después hay ciclos sin instrucción válida en Decode (69 en total).
-  \item \textbf{Dependencias RAW dentro del par.} 104 pares rotos. Los lazos encadenan \sig{addi}, \sig{slt} y \sig{beq} sobre el mismo registro, así que casi nunca hay dos instrucciones independientes juntas.
-  \item \textbf{Load-use.} 10 ciclos de stall, porque el dato de un \sig{lw} recién está disponible al final de MEM.
+  \item Saltos tomados: 68 flushes, uno por cada vuelta de los lazos de las etapas C y D. Cada uno anula el par que venía detrás, y después hay ciclos sin instrucción válida en Decode (69 en total).
+  \item Dependencias RAW dentro del par: 104 pares rotos. Los lazos encadenan \sig{addi}, \sig{slt} y \sig{beq} sobre el mismo registro, así que casi nunca hay dos instrucciones independientes juntas.
+  \item Load-use: 10 ciclos de stall, porque el dato de un \sig{lw} recién está disponible al final de MEM.
 \end{itemize}
 Ninguna de estas causas tiene que ver con la memoria. Por eso la optimización no puede acercar este programa al IPC de 2.
 
 \textbf{Impacto de la optimización.} C elimina todos los pares rotos por conflicto de memoria. El efecto depende de cuántos pares de ese tipo tenga el programa:
 \begin{itemize}
-  \item \textbf{Programa del profesor:} solo 6 pares rotos por memoria en B, en la etapa B. C ahorra 3 ciclos (speedup 1.008). Al juntar esos pares también cambia cómo se agrupan las instrucciones siguientes, por eso el ahorro no es de 6 ciclos.
-  \item \textbf{Programa propio:} 65 pares de memoria salen juntos en C y se ahorran 63 ciclos (speedup 1.107; el IPC sube de 0.78 a 0.86). Casi todos vienen de la burbuja: cada comparación empieza con dos \sig{lw} seguidos, y son 49 comparaciones. Se suman los 16 \sig{sw} de la inicialización y los \sig{lw} del lazo de suma.
+  \item En el programa del profesor hay solo 6 pares rotos por memoria en B, en la etapa B. C ahorra 3 ciclos (speedup 1.008). Al juntar esos pares también cambia cómo se agrupan las instrucciones siguientes, por eso el ahorro no es de 6 ciclos.
+  \item En el programa propio, 65 pares de memoria salen juntos en C y se ahorran 63 ciclos (speedup 1.107; el IPC sube de 0.78 a 0.86). Casi todos vienen de la burbuja: cada comparación empieza con dos \sig{lw} seguidos, y son 49 comparaciones. Se suman los 16 \sig{sw} de la inicialización y los \sig{lw} del lazo de suma.
 \end{itemize}
 
 \textbf{Cuándo no sirve.} No mejora los programas sin accesos a memoria seguidos: los Programas 2, 4--7, 9, 10, 12 y 13 dan los mismos ciclos que en B. Tampoco sirve si los dos accesos no caen en el mismo par. En la burbuja, el intercambio \sig{sw}+\sig{sw} queda partido entre dos pares (\sig{beq}+\sig{sw} y \sig{sw}+\sig{addi}) por cómo se alinean las instrucciones después del salto, así que esa parte no se beneficia.
@@ -1417,14 +1417,7 @@ Ninguna de estas causas tiene que ver con la memoria. Por eso la optimización n
 \section{Cómo reproducir las pruebas}
 % =====================================================================
 
-El código de cada arquitectura está en su carpeta: \sig{Single_Issue} (A), \sig{Dual_Issue} (B) y \sig{Dual_Issue optimizado} (C). En Vivado se siguen los pasos del Anexo~A de la Entrega~1 con los archivos de la Tabla~\ref{tab:repro-ef}. Con Icarus Verilog, desde la carpeta del programa:
-
-\begin{cmd}
-iverilog -g2012 -s tb_propio -o sim ../*.v tb_propio.v   # en A: tb_propio_single
-vvp sim                                       # imprime ciclos, IPC y PASS / FAIL
-\end{cmd}
-
-Con \sig{-s} se indica el testbench raíz; sin esa opción, Icarus también toma \sig{tb_proyecto.v} de la carpeta. Para el programa del profesor, desde la carpeta de la arquitectura: \sig{iverilog -g2012 -s tb_proyecto -o sim *.v}. En Vivado, \sig{riscvtest.dat} se agrega como simulation source. Las waveforms de este informe se generaron con GTKWave a partir de estas mismas simulaciones.
+El código de cada arquitectura está en su carpeta: \sig{Single_Issue} (A), \sig{Dual_Issue} (B) y \sig{Dual_Issue optimizado} (C). Para simular un programa se siguen los pasos del Anexo~A con los módulos de la carpeta de la arquitectura y los archivos de la Tabla~\ref{tab:repro-ef}. El testbench y el programa (\sig{.mem} o \sig{.dat}) se agregan como simulation sources, y el testbench se fija como top. Al terminar la simulación, la consola muestra los ciclos, el IPC y \sig{PASS} o \sig{FAIL}. En \sig{Single_Issue}, el testbench lleva el sufijo \sig{_single}; el del programa del profesor es \sig{tb_proyecto.v} en las tres.
 
 \begin{table}[htbp]
 \centering
